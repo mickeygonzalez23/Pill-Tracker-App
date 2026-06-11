@@ -1,0 +1,1299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Did I Take It? Pill Tracker Prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7f6;
+      --ink: #13201c;
+      --muted: #65736d;
+      --line: #d9e2de;
+      --panel: #ffffff;
+      --green: #1e7a58;
+      --green-soft: #e4f4ed;
+      --blue: #315f9d;
+      --blue-soft: #e8f0fb;
+      --amber: #9a6714;
+      --amber-soft: #fff1d3;
+      --red: #a64242;
+      --red-soft: #fde8e8;
+      --violet: #6a4c93;
+      --violet-soft: #f0eafb;
+      --shadow: 0 22px 60px rgba(24, 38, 34, .16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(260px, 360px) minmax(320px, 440px);
+      gap: 42px;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+
+    .brief {
+      max-width: 360px;
+    }
+
+    .brief h1 {
+      margin: 0 0 12px;
+      font-size: 42px;
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .brief p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.5;
+    }
+
+    .phrase {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      box-shadow: 0 8px 30px rgba(26, 40, 58, .08);
+    }
+
+    .phrase strong {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .phone {
+      width: min(100%, 390px);
+      height: 780px;
+      background: #101418;
+      border-radius: 38px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .screen {
+      height: 100%;
+      background: linear-gradient(180deg, #fbfcfb 0%, var(--bg) 42%, #eef4f1 100%);
+      border-radius: 30px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .statusbar {
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 22px 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .content {
+      flex: 1;
+      overflow: auto;
+      padding: 12px 18px 94px;
+    }
+
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .topline h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .date {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 8px 20px rgba(24, 38, 34, .05);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .metric b {
+      font-size: 22px;
+    }
+
+    .med-list,
+    .history-list,
+    .shortcut-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .med-card,
+    .history-item,
+    .shortcut-item,
+    .form-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 10px 24px rgba(24, 38, 34, .06);
+    }
+
+    .privacy-banner {
+      border: 1px solid #cfe5db;
+      background: #edf8f2;
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: #245b44;
+      font-size: 13px;
+      line-height: 1.4;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .med-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .nickname {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 3px;
+    }
+
+    .realname {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .due {
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .taken {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .next {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .med-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .primary,
+    .secondary,
+    .danger {
+      border: 0;
+      border-radius: 8px;
+      padding: 11px 12px;
+      font-weight: 800;
+      cursor: pointer;
+      min-height: 42px;
+    }
+
+    .primary {
+      background: var(--green);
+      color: white;
+      box-shadow: 0 8px 18px rgba(30, 122, 88, .18);
+    }
+
+    .secondary {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .danger {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .tabbar {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      height: 74px;
+      background: rgba(255, 255, 255, .95);
+      border-top: 1px solid var(--line);
+      border-radius: 0 0 30px 30px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      overflow: hidden;
+    }
+
+    .tab {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      padding: 8px 2px;
+    }
+
+    .tab span:first-child {
+      min-width: 26px;
+      min-height: 26px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      background: #eef3f1;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .tab.active {
+      color: var(--blue);
+      background: rgba(232, 240, 251, .7);
+    }
+
+    .tab.active span:first-child {
+      background: var(--blue);
+      color: white;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px 12px;
+      background: white;
+      color: var(--ink);
+    }
+
+    .dose-time-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .dose-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: white;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 750;
+      color: var(--ink);
+    }
+
+    .dose-chip input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--green);
+    }
+
+    .custom-dose-builder {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .custom-dose-row {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .custom-dose-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .custom-dose-fields {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 8px;
+    }
+
+    .custom-dose-fields input {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .reminder-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .mini-btn {
+      border: 0;
+      background: var(--red-soft);
+      color: var(--red);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    .note {
+      border-left: 4px solid var(--blue);
+      background: var(--blue-soft);
+      padding: 12px;
+      border-radius: 8px;
+      color: #244463;
+      font-size: 13px;
+      line-height: 1.4;
+      margin-bottom: 14px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .history-item strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .history-item span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .week-strip {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .day-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      min-height: 66px;
+      padding: 8px 4px;
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    .day-btn.active {
+      border-color: var(--blue);
+      background: var(--blue-soft);
+      color: var(--blue);
+      box-shadow: inset 0 0 0 1px var(--blue);
+    }
+
+    .day-name {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    .day-btn.active .day-name {
+      color: var(--blue);
+    }
+
+    .day-number {
+      font-size: 18px;
+      font-weight: 850;
+    }
+
+    .day-dots {
+      display: flex;
+      gap: 3px;
+      min-height: 6px;
+      align-items: center;
+    }
+
+    .day-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .history-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 4px 0 10px;
+    }
+
+    .history-heading h3 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .history-heading span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .shortcut-item {
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .siri-box {
+      background: #182722;
+      color: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 14px 30px rgba(24, 39, 34, .18);
+    }
+
+    .siri-box span {
+      display: block;
+      color: #b8cbc3;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+
+    .shortcut-group {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .shortcut-group h3 {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .shortcut-item {
+      border-left: 4px solid var(--violet);
+      background: #fff;
+    }
+
+    .toast {
+      position: absolute;
+      left: 28px;
+      right: 28px;
+      bottom: 94px;
+      background: #15202b;
+      color: white;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 14px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, .18);
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: .25s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 820px) {
+      .shell {
+        grid-template-columns: 1fr;
+        gap: 24px;
+        padding: 24px 14px;
+      }
+
+      .brief {
+        max-width: 520px;
+        margin: 0 auto;
+      }
+
+      .brief h1 {
+        font-size: 34px;
+      }
+
+      .phone {
+        margin: 0 auto;
+        height: 740px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="brief" aria-label="Prototype summary">
+      <h1>Did I Take It? Pill Tracker</h1>
+      <p>A private medication tracker concept built around Siri-safe nicknames, so a person can say they took a dose without Siri reading the real medication name aloud.</p>
+      <div class="phrase">
+        <strong>Locked iPhone phrase</strong>
+        Hey Siri, I took my sugar pill.
+      </div>
+    </section>
+
+    <section class="phone" aria-label="Did I Take It? Pill Tracker app prototype">
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span>Locked Siri ready</span>
+        </div>
+
+        <div class="content">
+          <section id="todayView" class="view">
+            <div class="topline">
+              <div>
+                <h2>Today</h2>
+                <div class="date">Sunday, June 7</div>
+              </div>
+              <button class="icon-btn" onclick="showToast('Reminder check complete')" title="Refresh">R</button>
+            </div>
+
+            <div class="summary">
+              <div class="metric">
+                <span>Taken</span>
+                <b id="takenCount">1</b>
+              </div>
+              <div class="metric">
+                <span>Due</span>
+                <b id="dueCount">2</b>
+              </div>
+            </div>
+
+            <div class="privacy-banner">
+              Siri uses your nicknames while locked, so real medication names stay inside the app.
+            </div>
+
+            <div class="med-list" id="todayList"></div>
+          </section>
+
+          <section id="medsView" class="view hidden">
+            <div class="topline">
+              <div>
+                <h2>Medications</h2>
+                <div class="date">Real names stay inside the app</div>
+              </div>
+              <button class="icon-btn" onclick="openAddForm()" title="Add medication">+</button>
+            </div>
+
+            <div id="addForm" class="form-panel hidden">
+              <div class="topline" style="margin-bottom:12px">
+                <div>
+                  <h2 id="formTitle" style="font-size:20px">Add Medication</h2>
+                  <div class="date" id="formSubtitle">Set nickname, frequency, and dose times</div>
+                </div>
+              </div>
+              <div class="field">
+                <label for="realName">Real medication name</label>
+                <input id="realName" value="Vitamin D">
+              </div>
+              <div class="field">
+                <label for="dose">Dose</label>
+                <input id="dose" value="1000 IU">
+              </div>
+              <div class="field">
+                <label for="nickname">Siri nickname</label>
+                <input id="nickname" value="sunshine pill">
+              </div>
+              <div class="field">
+                <label for="frequency">Frequency</label>
+                <select id="frequency" onchange="syncDoseTimesWithFrequency()">
+                  <option value="once">Once daily</option>
+                  <option value="twice" selected>Twice daily</option>
+                  <option value="custom">Custom times</option>
+                </select>
+              </div>
+              <div class="field" id="presetDoseTimes">
+                <label>Dose times</label>
+                <div class="dose-time-grid">
+                  <label class="dose-chip"><input type="checkbox" name="doseTime" value="Morning" checked>Morning</label>
+                  <label class="dose-chip"><input type="checkbox" name="doseTime" value="Noon">Noon</label>
+                  <label class="dose-chip"><input type="checkbox" name="doseTime" value="Evening" checked>Evening</label>
+                  <label class="dose-chip"><input type="checkbox" name="doseTime" value="Bedtime">Bedtime</label>
+                </div>
+              </div>
+              <div class="field hidden" id="customDoseTimes">
+                <label>Custom dose times</label>
+                <div class="custom-dose-builder" id="customDoseRows"></div>
+                <button class="secondary" type="button" onclick="addCustomDoseRow()">Add Dose</button>
+              </div>
+              <button class="primary" id="saveMedicationButton" onclick="saveMedication()">Save Medication</button>
+            </div>
+
+            <div class="note">Siri can use the nickname while the phone is locked. Keep each nickname unique and easy to say.</div>
+            <div class="med-list" id="medicationList"></div>
+          </section>
+
+          <section id="historyView" class="view hidden">
+            <div class="topline">
+              <div>
+                <h2>History</h2>
+                <div class="date">Tap a day to review pill history</div>
+              </div>
+            </div>
+            <div class="week-strip" id="weekCalendar"></div>
+            <div class="history-heading">
+              <h3 id="selectedDayLabel">Today</h3>
+              <span id="selectedDayCount">0 taken</span>
+            </div>
+            <div class="history-list" id="historyList"></div>
+          </section>
+
+          <section id="siriView" class="view hidden">
+            <div class="topline">
+              <div>
+                <h2>Siri Setup</h2>
+                <div class="date">Voice commands use nicknames</div>
+              </div>
+            </div>
+
+            <div class="siri-box">
+              <span>Try saying</span>
+              Hey Siri, I took my sugar pill.
+            </div>
+
+            <div class="shortcut-list">
+              <div class="shortcut-group">
+                <h3>Check Status</h3>
+                <div class="shortcut-item">Hey Siri, did I take my pills today?</div>
+                <div class="shortcut-item">Hey Siri, did I take my meds today?</div>
+                <div class="shortcut-item">Hey Siri, did I take my sugar pill today?</div>
+              </div>
+
+              <div class="shortcut-group">
+                <h3>Log Pills</h3>
+                <div class="shortcut-item">Hey Siri, I took my medication.</div>
+                <div class="shortcut-item">Hey Siri, I took my meds.</div>
+                <div class="shortcut-item">Hey Siri, I took my sugar pill.</div>
+                <div class="shortcut-item">Hey Siri, I took all of my meds.</div>
+              </div>
+
+              <div class="shortcut-group">
+                <h3>Specific Doses</h3>
+                <div class="shortcut-item">Hey Siri, I took sugar pill dose 1.</div>
+                <div class="shortcut-item">Hey Siri, I took sugar pill dose 2.</div>
+                <div class="shortcut-item">Hey Siri, I took my morning sugar pill.</div>
+                <div class="shortcut-item">Hey Siri, I took my evening sugar pill.</div>
+              </div>
+            </div>
+
+            <div style="height:14px"></div>
+            <button class="secondary" onclick="simulateSiri()">Simulate Locked Siri Log</button>
+            <div style="height:10px"></div>
+            <button class="secondary" onclick="simulateSiriStatus()">Ask Siri: Did I take my pills?</button>
+          </section>
+        </div>
+
+        <nav class="tabbar" aria-label="App tabs">
+          <button class="tab active" data-tab="todayView" onclick="setTab('todayView')"><span>✓</span><span>Today</span></button>
+          <button class="tab" data-tab="medsView" onclick="setTab('medsView')"><span>+</span><span>Meds</span></button>
+          <button class="tab" data-tab="historyView" onclick="setTab('historyView')"><span>◷</span><span>History</span></button>
+          <button class="tab" data-tab="siriView" onclick="setTab('siriView')"><span>⌕</span><span>Siri</span></button>
+        </nav>
+      </div>
+      <div id="toast" class="toast" role="status"></div>
+    </section>
+  </main>
+
+  <script>
+    const medications = [
+      { id: 1, realName: 'Metformin', dose: '500 mg', nickname: 'sugar pill', frequency: 'Twice daily', doseTimes: ['Morning', 'Evening'], doseStatuses: ['due', 'next'] },
+      { id: 2, realName: 'Lisinopril', dose: '10 mg', nickname: 'morning pill', frequency: 'Once daily', doseTimes: ['Morning'], doseStatuses: ['taken'] },
+      { id: 3, realName: 'Atorvastatin', dose: '20 mg', nickname: 'night pill', frequency: 'Once daily', doseTimes: ['Evening'], doseStatuses: ['next'] }
+    ];
+
+    let customDoseRows = [
+      { time: '08:00', label: 'Breakfast', reminder: true },
+      { time: '20:00', label: 'Bedtime', reminder: true }
+    ];
+
+    let editingMedicationId = null;
+
+    const weekDays = [
+      { key: 'sun', label: 'Sun', number: 7, fullLabel: 'Sunday, June 7' },
+      { key: 'mon', label: 'Mon', number: 8, fullLabel: 'Monday, June 8' },
+      { key: 'tue', label: 'Tue', number: 9, fullLabel: 'Tuesday, June 9' },
+      { key: 'wed', label: 'Wed', number: 10, fullLabel: 'Wednesday, June 10' },
+      { key: 'thu', label: 'Thu', number: 11, fullLabel: 'Thursday, June 11' },
+      { key: 'fri', label: 'Fri', number: 12, fullLabel: 'Friday, June 12' },
+      { key: 'sat', label: 'Sat', number: 13, fullLabel: 'Saturday, June 13' }
+    ];
+
+    const todayHistoryDay = 'sun';
+    let selectedHistoryDay = todayHistoryDay;
+
+    const history = [
+      { id: 101, day: 'sun', nickname: 'morning pill', realName: 'Lisinopril', time: '8:04 AM', source: 'manual' },
+      { id: 102, day: 'sat', nickname: 'sugar pill', realName: 'Metformin', time: '8:12 AM', source: 'siriLocked' },
+      { id: 103, day: 'fri', nickname: 'night pill', realName: 'Atorvastatin', time: '9:35 PM', source: 'manual' },
+      { id: 104, day: 'thu', nickname: 'morning pill', realName: 'Lisinopril', time: '8:01 AM', source: 'notification' }
+    ];
+
+    function setTab(id) {
+      document.querySelectorAll('.view').forEach(view => view.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === id);
+      });
+    }
+
+    function statusClass(status) {
+      if (status === 'taken') return 'taken';
+      if (status === 'next') return 'next';
+      return 'due';
+    }
+
+    function statusText(status) {
+      if (status === 'taken') return 'Taken';
+      if (status === 'next') return 'Next';
+      return 'Due';
+    }
+
+    function renderToday() {
+      const todayList = document.getElementById('todayList');
+      const doses = todayDoses();
+
+      todayList.innerHTML = doses.map(dose => `
+        <article class="med-card">
+          <div class="med-head">
+            <div>
+              <div class="nickname">${dose.displayName}</div>
+              <div class="realname">${dose.realName} - ${dose.doseAmount} - ${dose.doseTime}</div>
+            </div>
+            <span class="pill ${statusClass(dose.status)}">${statusText(dose.status)}</span>
+          </div>
+          <div class="med-actions">
+            <button class="primary" onclick="markDoseTaken(${dose.medicationId}, ${dose.doseIndex}, 'manual')">Mark Taken</button>
+            <button class="secondary" onclick="showToast('Siri phrase: Hey Siri, I took ${dose.nickname} dose ${dose.doseNumber}.')">Phrase</button>
+          </div>
+        </article>
+      `).join('');
+
+      document.getElementById('takenCount').textContent = doses.filter(dose => dose.status === 'taken').length;
+      document.getElementById('dueCount').textContent = doses.filter(dose => dose.status !== 'taken').length;
+    }
+
+    function renderMedications() {
+      const medicationList = document.getElementById('medicationList');
+      medicationList.innerHTML = medications.map(med => `
+        <article class="med-card">
+          <div class="med-head">
+            <div>
+              <div class="nickname">${med.realName}</div>
+              <div class="realname">Nickname: ${med.nickname} - ${med.dose} - ${formatDoseSchedule(med)}</div>
+            </div>
+            <span class="pill next">Private</span>
+          </div>
+          <div class="med-actions">
+            <button class="secondary" onclick="editMedication(${med.id})">Edit</button>
+            <button class="danger" onclick="deleteMedication(${med.id})">Delete</button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderHistory() {
+      const weekCalendar = document.getElementById('weekCalendar');
+      const historyList = document.getElementById('historyList');
+      const selectedDay = weekDays.find(day => day.key === selectedHistoryDay);
+      const selectedLogs = history.filter(item => item.day === selectedHistoryDay);
+
+      weekCalendar.innerHTML = weekDays.map(day => {
+        const logCount = history.filter(item => item.day === day.key).length;
+        const dots = Array.from({ length: Math.min(logCount, 3) }, () => '<span class="day-dot"></span>').join('');
+
+        return `
+          <button class="day-btn ${day.key === selectedHistoryDay ? 'active' : ''}" onclick="selectHistoryDay('${day.key}')">
+            <span class="day-name">${day.label}</span>
+            <span class="day-number">${day.number}</span>
+            <span class="day-dots">${dots}</span>
+          </button>
+        `;
+      }).join('');
+
+      document.getElementById('selectedDayLabel').textContent = selectedDay.fullLabel;
+      document.getElementById('selectedDayCount').textContent = selectedLogs.length === 1 ? '1 taken' : `${selectedLogs.length} taken`;
+
+      if (!selectedLogs.length) {
+        historyList.innerHTML = '<div class="note">No pills were marked taken on this day.</div>';
+        return;
+      }
+
+      historyList.innerHTML = selectedLogs.map(item => `
+        <div class="history-item">
+          <div>
+            <strong>${item.nickname}</strong>
+            <span>${item.realName} - ${item.time} - ${item.source}</span>
+          </div>
+          <button class="danger" onclick="undoLog(${item.id})">Undo</button>
+        </div>
+      `).join('');
+    }
+
+    function selectHistoryDay(dayKey) {
+      selectedHistoryDay = dayKey;
+      renderHistory();
+    }
+
+    function renderAll() {
+      renderToday();
+      renderMedications();
+      renderHistory();
+    }
+
+    function markTaken(id, source) {
+      const med = medications.find(item => item.id === id);
+      if (!med) return;
+      const firstOpenDose = med.doseStatuses.findIndex(status => status !== 'taken');
+
+      if (firstOpenDose === -1) {
+        showToast('That medication is already marked as taken today.');
+        return;
+      }
+
+      markDoseTaken(id, firstOpenDose, source);
+    }
+
+    function markDoseTaken(id, doseIndex, source) {
+      const med = medications.find(item => item.id === id);
+      if (!med) return;
+
+      med.doseStatuses[doseIndex] = 'taken';
+      const doseNumber = doseIndex + 1;
+      const doseTime = med.doseTimes[doseIndex];
+
+      history.unshift({
+        id: Date.now(),
+        day: todayHistoryDay,
+        nickname: `${med.nickname} dose ${doseNumber}`,
+        realName: med.realName,
+        time: `${doseTime} - just now`,
+        source
+      });
+      renderAll();
+      showToast(`Marked ${med.nickname} dose ${doseNumber} as taken.`);
+    }
+
+    function undoLog(id) {
+      const index = history.findIndex(item => item.id === id);
+      if (index === -1) return;
+      const [removed] = history.splice(index, 1);
+      const doseMatch = removed.nickname.match(/(.+) dose (\d+)/);
+
+      if (doseMatch) {
+        const med = medications.find(item => item.nickname === doseMatch[1]);
+        const doseIndex = Number(doseMatch[2]) - 1;
+        if (med && med.doseStatuses[doseIndex]) med.doseStatuses[doseIndex] = 'due';
+      }
+
+      renderAll();
+      showToast(`Undid ${removed.nickname}.`);
+    }
+
+    function deleteMedication(id) {
+      const index = medications.findIndex(item => item.id === id);
+      if (index === -1) return;
+
+      const [removed] = medications.splice(index, 1);
+      for (let i = history.length - 1; i >= 0; i -= 1) {
+        if (history[i].realName === removed.realName) history.splice(i, 1);
+      }
+
+      renderAll();
+      showToast(`Deleted ${removed.nickname}.`);
+    }
+
+    function openAddForm() {
+      editingMedicationId = null;
+      setFormMode('add');
+      resetMedicationForm();
+      document.getElementById('addForm').classList.toggle('hidden');
+    }
+
+    function saveMedication() {
+      const realName = document.getElementById('realName').value.trim();
+      const dose = document.getElementById('dose').value.trim();
+      const nickname = document.getElementById('nickname').value.trim().toLowerCase();
+      const frequencySelect = document.getElementById('frequency');
+      const frequency = frequencySelect.selectedOptions[0].textContent;
+      const doseTimes = frequencySelect.value === 'custom'
+        ? collectCustomDoseTimes()
+        : Array.from(document.querySelectorAll('input[name="doseTime"]:checked')).map(input => input.value);
+
+      if (!realName || !nickname) {
+        showToast('Add a real name and a Siri nickname.');
+        return;
+      }
+
+      if (!doseTimes.length) {
+        showToast('Choose at least one dose time.');
+        return;
+      }
+
+      if (medications.some(med => med.id !== editingMedicationId && med.nickname.toLowerCase() === nickname)) {
+        showToast('That Siri nickname is already used.');
+        return;
+      }
+
+      if (editingMedicationId) {
+        const med = medications.find(item => item.id === editingMedicationId);
+        if (!med) return;
+
+        med.realName = realName;
+        med.dose = dose;
+        med.nickname = nickname;
+        med.frequency = frequency;
+        med.doseTimes = doseTimes;
+        med.doseStatuses = doseTimes.map((_, index) => med.doseStatuses[index] || 'next');
+      } else {
+        medications.push({
+          id: Date.now(),
+          realName,
+          dose,
+          nickname,
+          frequency,
+          doseTimes,
+          doseStatuses: doseTimes.map(() => 'next')
+        });
+      }
+
+      document.getElementById('addForm').classList.add('hidden');
+      renderAll();
+      showToast(editingMedicationId ? `Updated ${nickname}.` : `Saved ${nickname}.`);
+      editingMedicationId = null;
+    }
+
+    function editMedication(id) {
+      const med = medications.find(item => item.id === id);
+      if (!med) return;
+
+      editingMedicationId = id;
+      setFormMode('edit');
+      document.getElementById('realName').value = med.realName;
+      document.getElementById('dose').value = med.dose;
+      document.getElementById('nickname').value = med.nickname;
+      setFrequencyFromMedication(med);
+      document.getElementById('addForm').classList.remove('hidden');
+      showToast(`Editing ${med.nickname}.`);
+    }
+
+    function setFormMode(mode) {
+      const isEdit = mode === 'edit';
+      document.getElementById('formTitle').textContent = isEdit ? 'Edit Medication' : 'Add Medication';
+      document.getElementById('formSubtitle').textContent = isEdit ? 'Update nickname, frequency, and dose times' : 'Set nickname, frequency, and dose times';
+      document.getElementById('saveMedicationButton').textContent = isEdit ? 'Update Medication' : 'Save Medication';
+    }
+
+    function resetMedicationForm() {
+      document.getElementById('realName').value = 'Vitamin D';
+      document.getElementById('dose').value = '1000 IU';
+      document.getElementById('nickname').value = 'sunshine pill';
+      document.getElementById('frequency').value = 'twice';
+      customDoseRows = [
+        { time: '08:00', label: 'Breakfast', reminder: true },
+        { time: '20:00', label: 'Bedtime', reminder: true }
+      ];
+      syncDoseTimesWithFrequency();
+    }
+
+    function setFrequencyFromMedication(med) {
+      const frequencySelect = document.getElementById('frequency');
+      const normalizedFrequency = med.frequency.toLowerCase();
+
+      if (normalizedFrequency.includes('once')) {
+        frequencySelect.value = 'once';
+      } else if (normalizedFrequency.includes('twice')) {
+        frequencySelect.value = 'twice';
+      } else {
+        frequencySelect.value = 'custom';
+      }
+
+      syncDoseTimesWithFrequency();
+
+      if (frequencySelect.value === 'custom') {
+        customDoseRows = med.doseTimes.map((doseTime, index) => ({
+          time: customDoseTimeToInputValue(doseTime),
+          label: customDoseTimeToLabel(doseTime) || `Dose ${index + 1}`,
+          reminder: true
+        }));
+        renderCustomDoseRows();
+        return;
+      }
+
+      const checkboxes = Array.from(document.querySelectorAll('input[name="doseTime"]'));
+      checkboxes.forEach(input => {
+        input.checked = med.doseTimes.includes(input.value);
+      });
+    }
+
+    function customDoseTimeToLabel(value) {
+      return value.replace(/\s+\d{1,2}:\d{2}\s?(AM|PM)$/i, '').trim();
+    }
+
+    function customDoseTimeToInputValue(value) {
+      const match = value.match(/(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+      if (!match) return '08:00';
+
+      let hour = Number(match[1]);
+      const minute = match[2];
+      const suffix = match[3].toUpperCase();
+
+      if (suffix === 'PM' && hour !== 12) hour += 12;
+      if (suffix === 'AM' && hour === 12) hour = 0;
+
+      return `${String(hour).padStart(2, '0')}:${minute}`;
+    }
+
+    function formatDoseSchedule(med) {
+      return `${med.frequency}: ${med.doseTimes.join(', ')}`;
+    }
+
+    function syncDoseTimesWithFrequency() {
+      const frequency = document.getElementById('frequency').value;
+      const checkboxes = Array.from(document.querySelectorAll('input[name="doseTime"]'));
+      const presetDoseTimes = document.getElementById('presetDoseTimes');
+      const customDoseTimes = document.getElementById('customDoseTimes');
+      const selected = {
+        once: ['Morning'],
+        twice: ['Morning', 'Evening'],
+        custom: []
+      }[frequency];
+
+      presetDoseTimes.classList.toggle('hidden', frequency === 'custom');
+      customDoseTimes.classList.toggle('hidden', frequency !== 'custom');
+
+      if (frequency === 'custom') {
+        renderCustomDoseRows();
+        return;
+      }
+
+      if (!selected.length) return;
+
+      checkboxes.forEach(input => {
+        input.checked = selected.includes(input.value);
+      });
+    }
+
+    function renderCustomDoseRows() {
+      const customDoseRowsEl = document.getElementById('customDoseRows');
+      customDoseRowsEl.innerHTML = customDoseRows.map((row, index) => `
+        <div class="custom-dose-row">
+          <div class="custom-dose-head">
+            <span>Dose ${index + 1}</span>
+            <button class="mini-btn" type="button" onclick="removeCustomDoseRow(${index})">Remove</button>
+          </div>
+          <div class="custom-dose-fields">
+            <input type="time" value="${row.time}" onchange="updateCustomDoseRow(${index}, 'time', this.value)">
+            <input type="text" value="${row.label}" placeholder="Label" onchange="updateCustomDoseRow(${index}, 'label', this.value)">
+          </div>
+          <label class="reminder-check">
+            <input type="checkbox" ${row.reminder ? 'checked' : ''} onchange="updateCustomDoseRow(${index}, 'reminder', this.checked)">
+            Reminder on
+          </label>
+        </div>
+      `).join('');
+    }
+
+    function addCustomDoseRow() {
+      customDoseRows.push({ time: '12:00', label: 'Afternoon', reminder: true });
+      renderCustomDoseRows();
+    }
+
+    function removeCustomDoseRow(index) {
+      if (customDoseRows.length === 1) {
+        showToast('At least one custom dose is required.');
+        return;
+      }
+
+      customDoseRows.splice(index, 1);
+      renderCustomDoseRows();
+    }
+
+    function updateCustomDoseRow(index, field, value) {
+      customDoseRows[index][field] = value;
+    }
+
+    function collectCustomDoseTimes() {
+      return customDoseRows
+        .map((row, index) => {
+          const label = row.label.trim() || `Dose ${index + 1}`;
+          return `${label} ${formatClockTime(row.time)}`;
+        })
+        .filter(Boolean);
+    }
+
+    function formatClockTime(value) {
+      if (!value) return '';
+      const [hourText, minute] = value.split(':');
+      let hour = Number(hourText);
+      const suffix = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12 || 12;
+      return `${hour}:${minute} ${suffix}`;
+    }
+
+    function simulateSiri() {
+      const sugarPill = medications.find(item => item.nickname === 'sugar pill');
+
+      if (sugarPill) {
+        markDoseTaken(sugarPill.id, 0, 'siriLocked');
+        return;
+      }
+
+      const nextDose = todayDoses().find(item => item.status !== 'taken');
+      if (nextDose) markDoseTaken(nextDose.medicationId, nextDose.doseIndex, 'siriLocked');
+    }
+
+    function simulateSiriStatus() {
+      const doses = todayDoses();
+      const taken = doses.filter(item => item.status === 'taken').length;
+      const total = doses.length;
+
+      if (taken === total) {
+        showToast('Siri: All of your pills are marked as taken today.');
+        return;
+      }
+
+      if (taken === 0) {
+        showToast('Siri: No pills are marked as taken today.');
+        return;
+      }
+
+      showToast(`Siri: You marked ${taken} of ${total} pills as taken today.`);
+    }
+
+    function todayDoses() {
+      return medications.flatMap(med => med.doseTimes.map((doseTime, index) => ({
+        medicationId: med.id,
+        doseIndex: index,
+        doseNumber: index + 1,
+        nickname: med.nickname,
+        realName: med.realName,
+        doseAmount: med.dose,
+        doseTime,
+        status: med.doseStatuses[index] || 'due',
+        displayName: med.doseTimes.length > 1 ? `${med.nickname} dose ${index + 1}` : med.nickname
+      })));
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(window.toastTimer);
+      window.toastTimer = window.setTimeout(() => toast.classList.remove('show'), 2400);
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
