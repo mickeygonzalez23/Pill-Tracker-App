@@ -7,26 +7,14 @@
 
 import SwiftUI
 
-struct MedicationDose: Identifiable {
-    let id = UUID()
-    let nickname: String
-    let realName: String
-    let dose: String
-    let timeLabel: String
-    let status: DoseStatus
-}
-
 enum DoseStatus: String {
     case due = "Due"
-    case next = "Next"
     case taken = "Taken"
 
     var color: Color {
         switch self {
         case .due:
             return .orange
-        case .next:
-            return .blue
         case .taken:
             return .green
         }
@@ -34,64 +22,70 @@ enum DoseStatus: String {
 }
 
 struct ContentView: View {
-    private let todayDoses = [
-        MedicationDose(
-            nickname: "sugar pill dose 1",
-            realName: "Metformin",
-            dose: "500 mg",
-            timeLabel: "Morning",
-            status: .due
-        ),
-        MedicationDose(
-            nickname: "sugar pill dose 2",
-            realName: "Metformin",
-            dose: "500 mg",
-            timeLabel: "Evening",
-            status: .next
-        ),
-        MedicationDose(
-            nickname: "night pill",
-            realName: "Atorvastatin",
-            dose: "20 mg",
-            timeLabel: "Bedtime",
-            status: .taken
-        )
-    ]
+    @StateObject private var store = MedicationStore()
+    @State private var isShowingAddMedication = false
 
     var body: some View {
         TabView {
-            TodayView(doses: todayDoses)
-                .tabItem {
-                    Label("Today", systemImage: "checklist")
-                }
+            TodayView(
+                medications: store.medications,
+                isShowingAddMedication: $isShowingAddMedication,
+                updateMedication: store.update
+            )
+            .tabItem {
+                Label("Today", systemImage: "checklist")
+            }
 
-            MedicationsView(doses: todayDoses)
-                .tabItem {
-                    Label("Meds", systemImage: "pills")
-                }
+            MedicationsView(
+                medications: store.medications,
+                isShowingAddMedication: $isShowingAddMedication,
+                deleteMedication: store.delete
+            )
+            .tabItem {
+                Label("Meds", systemImage: "pills")
+            }
 
-            HistoryView()
+            HistoryView(medications: store.medications)
                 .tabItem {
                     Label("History", systemImage: "calendar")
                 }
 
-            SiriView()
+            SiriView(medications: store.medications)
                 .tabItem {
                     Label("Siri", systemImage: "waveform")
                 }
+        }
+        .sheet(isPresented: $isShowingAddMedication) {
+            AddMedicationView(
+                existingNicknames: store.medications.map(\.siriNickname),
+                addMedication: store.add
+            )
         }
     }
 }
 
 struct TodayView: View {
-    let doses: [MedicationDose]
+    let medications: [Medication]
+    @Binding var isShowingAddMedication: Bool
+    let updateMedication: (Medication) -> Void
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(doses) { dose in
-                        DoseRow(dose: dose)
+                if medications.isEmpty {
+                    ContentUnavailableView(
+                        "No Meds Yet",
+                        systemImage: "pills",
+                        description: Text("Tap the plus button to add your first medication.")
+                    )
+                } else {
+                    Section("Today's Doses") {
+                        ForEach(medications) { medication in
+                            DoseRow(
+                                medication: medication,
+                                updateMedication: updateMedication
+                            )
+                        }
                     }
                 }
             }
@@ -99,6 +93,7 @@ struct TodayView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        isShowingAddMedication = true
                     } label: {
                         Label("Add Medication", systemImage: "plus")
                     }
@@ -109,62 +104,90 @@ struct TodayView: View {
 }
 
 struct DoseRow: View {
-    let dose: MedicationDose
+    let medication: Medication
+    let updateMedication: (Medication) -> Void
+
+    private var status: DoseStatus {
+        medication.isTakenToday ? .taken : .due
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(dose.nickname)
+                Text(medication.siriNickname)
                     .font(.headline)
 
                 Spacer()
 
-                Text(dose.status.rawValue)
+                Text(status.rawValue)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(dose.status.color.opacity(0.16))
-                    .foregroundStyle(dose.status.color)
+                    .background(status.color.opacity(0.16))
+                    .foregroundStyle(status.color)
                     .clipShape(Capsule())
             }
 
-            Text("\(dose.realName) - \(dose.dose) - \(dose.timeLabel)")
+            Text("\(medication.realName) - \(medication.dose) - \(medication.doseTime)")
                 .foregroundStyle(.secondary)
 
             Button {
+                var updatedMedication = medication
+                updatedMedication.isTakenToday.toggle()
+                updateMedication(updatedMedication)
             } label: {
-                Label("Mark Taken", systemImage: "checkmark.circle.fill")
+                Label(
+                    medication.isTakenToday ? "Undo Taken" : "Mark Taken",
+                    systemImage: medication.isTakenToday ? "arrow.uturn.backward.circle" : "checkmark.circle.fill"
+                )
             }
             .buttonStyle(.borderedProminent)
-            .disabled(dose.status == .taken)
         }
         .padding(.vertical, 6)
     }
 }
 
 struct MedicationsView: View {
-    let doses: [MedicationDose]
+    let medications: [Medication]
+    @Binding var isShowingAddMedication: Bool
+    let deleteMedication: (Medication) -> Void
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(doses) { dose in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(dose.realName)
-                            .font(.headline)
-                        Text("Siri name: \(dose.nickname)")
-                            .foregroundStyle(.secondary)
-                        Text("\(dose.dose) - \(dose.timeLabel)")
-                            .foregroundStyle(.secondary)
+                if medications.isEmpty {
+                    ContentUnavailableView(
+                        "No Medications",
+                        systemImage: "pills",
+                        description: Text("Add a medication to start tracking doses.")
+                    )
+                } else {
+                    ForEach(medications) { medication in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(medication.realName)
+                                .font(.headline)
+                            Text("Siri name: \(medication.siriNickname)")
+                                .foregroundStyle(.secondary)
+                            Text("\(medication.dose) - \(medication.doseTime)")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 6)
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                deleteMedication(medication)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
-                    .padding(.vertical, 6)
                 }
             }
             .navigationTitle("Meds")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        isShowingAddMedication = true
                     } label: {
                         Label("Add Medication", systemImage: "plus")
                     }
@@ -174,13 +197,114 @@ struct MedicationsView: View {
     }
 }
 
+struct AddMedicationView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let existingNicknames: [String]
+    let addMedication: (Medication) -> Void
+
+    @State private var realName = ""
+    @State private var dose = ""
+    @State private var siriNickname = ""
+    @State private var doseTime = "Morning"
+
+    private let doseTimes = ["Morning", "Noon", "Evening", "Bedtime"]
+
+    private var trimmedRealName: String {
+        realName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedDose: String {
+        dose.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedNickname: String {
+        siriNickname.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var nicknameAlreadyExists: Bool {
+        existingNicknames.contains { nickname in
+            nickname.caseInsensitiveCompare(trimmedNickname) == .orderedSame
+        }
+    }
+
+    private var canSave: Bool {
+        !trimmedRealName.isEmpty &&
+        !trimmedDose.isEmpty &&
+        !trimmedNickname.isEmpty &&
+        !nicknameAlreadyExists
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Medication") {
+                    TextField("Real name", text: $realName)
+                    TextField("Dose", text: $dose)
+                }
+
+                Section("Private Siri Name") {
+                    TextField("Example: sugar pill", text: $siriNickname)
+
+                    if nicknameAlreadyExists {
+                        Text("That Siri nickname is already being used.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                Section("Dose Time") {
+                    Picker("Time", selection: $doseTime) {
+                        ForEach(doseTimes, id: \.self) { time in
+                            Text(time)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add Medication")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveMedication()
+                    }
+                    .disabled(!canSave)
+                }
+            }
+        }
+    }
+
+    private func saveMedication() {
+        let medication = Medication(
+            realName: trimmedRealName,
+            dose: trimmedDose,
+            siriNickname: trimmedNickname,
+            doseTime: doseTime
+        )
+        addMedication(medication)
+        dismiss()
+    }
+}
+
 struct HistoryView: View {
+    let medications: [Medication]
+
+    private var takenCount: Int {
+        medications.filter(\.isTakenToday).count
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                Section("This Week") {
-                    Label("2 doses marked taken today", systemImage: "checkmark.circle")
-                    Label("1 dose due later", systemImage: "clock")
+                Section("Today") {
+                    Label("\(takenCount) marked taken", systemImage: "checkmark.circle")
+                    Label("\(max(medications.count - takenCount, 0)) still due", systemImage: "clock")
                 }
             }
             .navigationTitle("History")
@@ -189,13 +313,19 @@ struct HistoryView: View {
 }
 
 struct SiriView: View {
+    let medications: [Medication]
+
     var body: some View {
         NavigationStack {
             List {
                 Section("Private Siri Phrases") {
-                    Text("Hey Siri, I took my sugar pill.")
-                    Text("Hey Siri, I took sugar pill dose 1.")
-                    Text("Hey Siri, did I take my pills today?")
+                    if medications.isEmpty {
+                        Text("Add a medication to see Siri phrase examples.")
+                    } else {
+                        ForEach(medications) { medication in
+                            Text("Hey Siri, I took my \(medication.siriNickname).")
+                        }
+                    }
                 }
 
                 Section("Privacy") {
@@ -205,8 +335,4 @@ struct SiriView: View {
             .navigationTitle("Siri")
         }
     }
-}
-
-#Preview {
-    ContentView()
 }
