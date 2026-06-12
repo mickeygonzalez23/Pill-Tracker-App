@@ -14,8 +14,218 @@ struct Medication: Identifiable, Codable, Equatable {
     var dose: String
     var siriNickname: String
     var doseTime: String
-    var isTakenToday: Bool = false
+    var scheduleKind: ScheduleKind = .onceDaily
+    var doseTimes: [String] = []
+    var intervalHours: Int = 4
+    var intervalStartTime: String = "8:00 AM"
+    var intervalEndTime: String = "8:00 PM"
+    var dayScheduleKind: DayScheduleKind = .everyDay
+    var selectedWeekdays: [Int] = Weekday.allCases.map(\.id)
+    var takenDoseTimesToday: [String] = []
+    var unsureDoseTimesToday: [String] = []
+    var doseStatusHistory: [String: [String: String]] = [:]
     var createdAt = Date()
+
+    nonisolated var displayDoseTimes: [String] {
+        if !doseTimes.isEmpty {
+            return doseTimes
+        }
+
+        return [doseTime]
+    }
+
+    var scheduleSummary: String {
+        switch scheduleKind {
+        case .onceDaily:
+            return displayDoseTimes.first ?? doseTime
+        case .twiceDaily, .specificTimes:
+            return displayDoseTimes.joined(separator: ", ")
+        case .everyXHours:
+            return "Every \(intervalHours) hours, \(intervalStartTime)-\(intervalEndTime)"
+        }
+    }
+
+    var isTakenToday: Bool {
+        get {
+            !displayDoseTimes.isEmpty && displayDoseTimes.allSatisfy { takenDoseTimesToday.contains($0) }
+        }
+        set {
+            takenDoseTimesToday = newValue ? displayDoseTimes : []
+        }
+    }
+
+    var daySummary: String {
+        switch dayScheduleKind {
+        case .everyDay:
+            return "Every day"
+        case .specificDays:
+            return Weekday.allCases
+                .filter { selectedWeekdays.contains($0.id) }
+                .map(\.shortName)
+                .joined(separator: ", ")
+        }
+    }
+
+    var isDueToday: Bool {
+        dayScheduleKind == .everyDay || selectedWeekdays.contains(Weekday.todayID)
+    }
+
+    init(
+        id: UUID = UUID(),
+        realName: String,
+        dose: String,
+        siriNickname: String,
+        doseTime: String,
+        scheduleKind: ScheduleKind = .onceDaily,
+        doseTimes: [String] = [],
+        intervalHours: Int = 4,
+        intervalStartTime: String = "8:00 AM",
+        intervalEndTime: String = "8:00 PM",
+        dayScheduleKind: DayScheduleKind = .everyDay,
+        selectedWeekdays: [Int] = Weekday.allCases.map(\.id),
+        takenDoseTimesToday: [String] = [],
+        unsureDoseTimesToday: [String] = [],
+        doseStatusHistory: [String: [String: String]] = [:],
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.realName = realName
+        self.dose = dose
+        self.siriNickname = siriNickname
+        self.doseTime = doseTime
+        self.scheduleKind = scheduleKind
+        self.doseTimes = doseTimes.isEmpty ? [doseTime] : doseTimes
+        self.intervalHours = intervalHours
+        self.intervalStartTime = intervalStartTime
+        self.intervalEndTime = intervalEndTime
+        self.dayScheduleKind = dayScheduleKind
+        self.selectedWeekdays = selectedWeekdays
+        self.takenDoseTimesToday = takenDoseTimesToday
+        self.unsureDoseTimesToday = unsureDoseTimesToday
+        self.doseStatusHistory = doseStatusHistory
+        self.createdAt = createdAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case realName
+        case dose
+        case siriNickname
+        case doseTime
+        case scheduleKind
+        case doseTimes
+        case intervalHours
+        case intervalStartTime
+        case intervalEndTime
+        case dayScheduleKind
+        case selectedWeekdays
+        case takenDoseTimesToday
+        case unsureDoseTimesToday
+        case doseStatusHistory
+        case isTakenToday
+        case createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        realName = try container.decode(String.self, forKey: .realName)
+        dose = try container.decode(String.self, forKey: .dose)
+        siriNickname = try container.decode(String.self, forKey: .siriNickname)
+        doseTime = try container.decode(String.self, forKey: .doseTime)
+        scheduleKind = try container.decodeIfPresent(ScheduleKind.self, forKey: .scheduleKind) ?? .onceDaily
+        doseTimes = try container.decodeIfPresent([String].self, forKey: .doseTimes) ?? [doseTime]
+        intervalHours = try container.decodeIfPresent(Int.self, forKey: .intervalHours) ?? 4
+        intervalStartTime = try container.decodeIfPresent(String.self, forKey: .intervalStartTime) ?? "8:00 AM"
+        intervalEndTime = try container.decodeIfPresent(String.self, forKey: .intervalEndTime) ?? "8:00 PM"
+        dayScheduleKind = try container.decodeIfPresent(DayScheduleKind.self, forKey: .dayScheduleKind) ?? .everyDay
+        selectedWeekdays = try container.decodeIfPresent([Int].self, forKey: .selectedWeekdays) ?? Weekday.allCases.map(\.id)
+        takenDoseTimesToday = try container.decodeIfPresent([String].self, forKey: .takenDoseTimesToday) ?? []
+        unsureDoseTimesToday = try container.decodeIfPresent([String].self, forKey: .unsureDoseTimesToday) ?? []
+        doseStatusHistory = try container.decodeIfPresent([String: [String: String]].self, forKey: .doseStatusHistory) ?? [:]
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+
+        if try container.decodeIfPresent(Bool.self, forKey: .isTakenToday) == true {
+            takenDoseTimesToday = doseTimes
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(realName, forKey: .realName)
+        try container.encode(dose, forKey: .dose)
+        try container.encode(siriNickname, forKey: .siriNickname)
+        try container.encode(doseTime, forKey: .doseTime)
+        try container.encode(scheduleKind, forKey: .scheduleKind)
+        try container.encode(doseTimes, forKey: .doseTimes)
+        try container.encode(intervalHours, forKey: .intervalHours)
+        try container.encode(intervalStartTime, forKey: .intervalStartTime)
+        try container.encode(intervalEndTime, forKey: .intervalEndTime)
+        try container.encode(dayScheduleKind, forKey: .dayScheduleKind)
+        try container.encode(selectedWeekdays, forKey: .selectedWeekdays)
+        try container.encode(takenDoseTimesToday, forKey: .takenDoseTimesToday)
+        try container.encode(unsureDoseTimesToday, forKey: .unsureDoseTimesToday)
+        try container.encode(doseStatusHistory, forKey: .doseStatusHistory)
+        try container.encode(createdAt, forKey: .createdAt)
+    }
+}
+
+enum ScheduleKind: String, CaseIterable, Codable, Identifiable {
+    case onceDaily = "Once daily"
+    case twiceDaily = "Twice daily"
+    case specificTimes = "Specific times"
+    case everyXHours = "Every X hours"
+
+    var id: String {
+        rawValue
+    }
+}
+
+enum DayScheduleKind: String, CaseIterable, Codable, Identifiable {
+    case everyDay = "Every day"
+    case specificDays = "Specific days"
+
+    var id: String {
+        rawValue
+    }
+}
+
+enum Weekday: Int, CaseIterable, Identifiable {
+    case sunday = 1
+    case monday = 2
+    case tuesday = 3
+    case wednesday = 4
+    case thursday = 5
+    case friday = 6
+    case saturday = 7
+
+    var id: Int {
+        rawValue
+    }
+
+    var shortName: String {
+        switch self {
+        case .sunday:
+            return "Sun"
+        case .monday:
+            return "Mon"
+        case .tuesday:
+            return "Tue"
+        case .wednesday:
+            return "Wed"
+        case .thursday:
+            return "Thu"
+        case .friday:
+            return "Fri"
+        case .saturday:
+            return "Sat"
+        }
+    }
+
+    static var todayID: Int {
+        Calendar.current.component(.weekday, from: Date())
+    }
 }
 
 final class MedicationStore: ObservableObject {
