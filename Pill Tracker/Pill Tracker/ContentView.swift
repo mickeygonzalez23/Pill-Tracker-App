@@ -24,6 +24,7 @@ enum DoseStatus: String {
 struct ContentView: View {
     @StateObject private var store = MedicationStore()
     @State private var isShowingAddMedication = false
+    @State private var medicationToEdit: Medication?
 
     var body: some View {
         TabView {
@@ -39,6 +40,8 @@ struct ContentView: View {
             MedicationsView(
                 medications: store.medications,
                 isShowingAddMedication: $isShowingAddMedication,
+                medicationToEdit: $medicationToEdit,
+                updateMedication: store.update,
                 deleteMedication: store.delete
             )
             .tabItem {
@@ -56,9 +59,20 @@ struct ContentView: View {
                 }
         }
         .sheet(isPresented: $isShowingAddMedication) {
-            AddMedicationView(
+            MedicationFormView(
+                title: "Add Medication",
                 existingNicknames: store.medications.map(\.siriNickname),
-                addMedication: store.add
+                onSave: store.add
+            )
+        }
+        .sheet(item: $medicationToEdit) { medication in
+            MedicationFormView(
+                title: "Edit Medication",
+                medication: medication,
+                existingNicknames: store.medications
+                    .filter { $0.id != medication.id }
+                    .map(\.siriNickname),
+                onSave: store.update
             )
         }
     }
@@ -151,6 +165,8 @@ struct DoseRow: View {
 struct MedicationsView: View {
     let medications: [Medication]
     @Binding var isShowingAddMedication: Bool
+    @Binding var medicationToEdit: Medication?
+    let updateMedication: (Medication) -> Void
     let deleteMedication: (Medication) -> Void
 
     var body: some View {
@@ -164,16 +180,42 @@ struct MedicationsView: View {
                     )
                 } else {
                     ForEach(medications) { medication in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(medication.realName)
-                                .font(.headline)
-                            Text("Siri name: \(medication.siriNickname)")
-                                .foregroundStyle(.secondary)
-                            Text("\(medication.dose) - \(medication.doseTime)")
-                                .foregroundStyle(.secondary)
+                        Button {
+                            medicationToEdit = medication
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(medication.realName)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    Text("Siri name: \(medication.siriNickname)")
+                                        .foregroundStyle(.secondary)
+                                    Text("\(medication.dose) - \(medication.doseTime)")
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
+                        .buttonStyle(.plain)
                         .padding(.vertical, 6)
                         .swipeActions {
+                            Button {
+                                var updatedMedication = medication
+                                updatedMedication.isTakenToday.toggle()
+                                updateMedication(updatedMedication)
+                            } label: {
+                                Label(
+                                    medication.isTakenToday ? "Undo" : "Taken",
+                                    systemImage: medication.isTakenToday ? "arrow.uturn.backward.circle" : "checkmark.circle"
+                                )
+                            }
+                            .tint(.green)
+
                             Button(role: .destructive) {
                                 deleteMedication(medication)
                             } label: {
@@ -197,11 +239,13 @@ struct MedicationsView: View {
     }
 }
 
-struct AddMedicationView: View {
+struct MedicationFormView: View {
     @Environment(\.dismiss) private var dismiss
 
+    let title: String
+    var medication: Medication?
     let existingNicknames: [String]
-    let addMedication: (Medication) -> Void
+    let onSave: (Medication) -> Void
 
     @State private var realName = ""
     @State private var dose = ""
@@ -209,6 +253,23 @@ struct AddMedicationView: View {
     @State private var doseTime = "Morning"
 
     private let doseTimes = ["Morning", "Noon", "Evening", "Bedtime"]
+
+    init(
+        title: String,
+        medication: Medication? = nil,
+        existingNicknames: [String],
+        onSave: @escaping (Medication) -> Void
+    ) {
+        self.title = title
+        self.medication = medication
+        self.existingNicknames = existingNicknames
+        self.onSave = onSave
+
+        _realName = State(initialValue: medication?.realName ?? "")
+        _dose = State(initialValue: medication?.dose ?? "")
+        _siriNickname = State(initialValue: medication?.siriNickname ?? "")
+        _doseTime = State(initialValue: medication?.doseTime ?? "Morning")
+    }
 
     private var trimmedRealName: String {
         realName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -261,7 +322,7 @@ struct AddMedicationView: View {
                     }
                 }
             }
-            .navigationTitle("Add Medication")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -272,7 +333,7 @@ struct AddMedicationView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        saveMedication()
+                        saveMedicationChanges()
                     }
                     .disabled(!canSave)
                 }
@@ -280,14 +341,19 @@ struct AddMedicationView: View {
         }
     }
 
-    private func saveMedication() {
-        let medication = Medication(
+    private func saveMedicationChanges() {
+        var savedMedication = medication ?? Medication(
             realName: trimmedRealName,
             dose: trimmedDose,
             siriNickname: trimmedNickname,
             doseTime: doseTime
         )
-        addMedication(medication)
+        savedMedication.realName = trimmedRealName
+        savedMedication.dose = trimmedDose
+        savedMedication.siriNickname = trimmedNickname
+        savedMedication.doseTime = doseTime
+
+        onSave(savedMedication)
         dismiss()
     }
 }
