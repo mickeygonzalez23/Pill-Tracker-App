@@ -24,6 +24,7 @@ struct Medication: Identifiable, Codable, Equatable {
     var takenDoseTimesToday: [String] = []
     var unsureDoseTimesToday: [String] = []
     var doseStatusHistory: [String: [String: String]] = [:]
+    var remindersEnabled = true
     var createdAt = Date()
 
     nonisolated var displayDoseTimes: [String] {
@@ -86,6 +87,7 @@ struct Medication: Identifiable, Codable, Equatable {
         takenDoseTimesToday: [String] = [],
         unsureDoseTimesToday: [String] = [],
         doseStatusHistory: [String: [String: String]] = [:],
+        remindersEnabled: Bool = true,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -103,6 +105,7 @@ struct Medication: Identifiable, Codable, Equatable {
         self.takenDoseTimesToday = takenDoseTimesToday
         self.unsureDoseTimesToday = unsureDoseTimesToday
         self.doseStatusHistory = doseStatusHistory
+        self.remindersEnabled = remindersEnabled
         self.createdAt = createdAt
     }
 
@@ -122,6 +125,7 @@ struct Medication: Identifiable, Codable, Equatable {
         case takenDoseTimesToday
         case unsureDoseTimesToday
         case doseStatusHistory
+        case remindersEnabled
         case isTakenToday
         case createdAt
     }
@@ -143,6 +147,7 @@ struct Medication: Identifiable, Codable, Equatable {
         takenDoseTimesToday = try container.decodeIfPresent([String].self, forKey: .takenDoseTimesToday) ?? []
         unsureDoseTimesToday = try container.decodeIfPresent([String].self, forKey: .unsureDoseTimesToday) ?? []
         doseStatusHistory = try container.decodeIfPresent([String: [String: String]].self, forKey: .doseStatusHistory) ?? [:]
+        remindersEnabled = try container.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
 
         if try container.decodeIfPresent(Bool.self, forKey: .isTakenToday) == true {
@@ -167,6 +172,7 @@ struct Medication: Identifiable, Codable, Equatable {
         try container.encode(takenDoseTimesToday, forKey: .takenDoseTimesToday)
         try container.encode(unsureDoseTimesToday, forKey: .unsureDoseTimesToday)
         try container.encode(doseStatusHistory, forKey: .doseStatusHistory)
+        try container.encode(remindersEnabled, forKey: .remindersEnabled)
         try container.encode(createdAt, forKey: .createdAt)
     }
 }
@@ -232,6 +238,7 @@ final class MedicationStore: ObservableObject {
     @Published var medications: [Medication] = [] {
         didSet {
             save()
+            NotificationScheduler.scheduleReminders(for: medications)
         }
     }
 
@@ -239,6 +246,7 @@ final class MedicationStore: ObservableObject {
 
     init() {
         load()
+        NotificationScheduler.requestPermissionAndSchedule(for: medications)
     }
 
     func add(_ medication: Medication) {

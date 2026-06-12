@@ -321,6 +321,12 @@ struct MedicationsView: View {
                                         .foregroundStyle(.secondary)
                                     Text(medication.daySummary)
                                         .foregroundStyle(.secondary)
+                                    Label(
+                                        medication.remindersEnabled ? "Reminders on" : "Reminders off",
+                                        systemImage: medication.remindersEnabled ? "bell" : "bell.slash"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(medication.remindersEnabled ? .blue : .secondary)
                                 }
 
                                 Spacer()
@@ -390,6 +396,7 @@ struct MedicationFormView: View {
     @State private var intervalEndTime = "8:00 PM"
     @State private var dayScheduleKind = DayScheduleKind.everyDay
     @State private var selectedWeekdays = Set(Weekday.allCases.map(\.id))
+    @State private var remindersEnabled = true
     @State private var isShowingDeleteConfirmation = false
 
     private let intervalChoices = [1, 2, 3, 4, 6, 8, 12]
@@ -425,6 +432,7 @@ struct MedicationFormView: View {
         _intervalEndTime = State(initialValue: medication?.intervalEndTime ?? "8:00 PM")
         _dayScheduleKind = State(initialValue: medication?.dayScheduleKind ?? .everyDay)
         _selectedWeekdays = State(initialValue: Set(medication?.selectedWeekdays ?? Weekday.allCases.map(\.id)))
+        _remindersEnabled = State(initialValue: medication?.remindersEnabled ?? true)
     }
 
     private var trimmedRealName: String {
@@ -502,6 +510,14 @@ struct MedicationFormView: View {
                         }
                     }
                 }
+
+                    formSection("Reminders") {
+                        Toggle("Send reminders", isOn: $remindersEnabled)
+
+                        Text(remindersEnabled ? "Notifications will be scheduled for this medication's dose times." : "No notifications will be scheduled for this medication.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     formSection("Dose Time") {
                     Picker("Schedule", selection: $scheduleKind) {
@@ -645,6 +661,7 @@ struct MedicationFormView: View {
         savedMedication.intervalEndTime = intervalEndTime
         savedMedication.dayScheduleKind = dayScheduleKind
         savedMedication.selectedWeekdays = selectedWeekdays.sorted()
+        savedMedication.remindersEnabled = remindersEnabled
         savedMedication.takenDoseTimesToday = savedMedication.takenDoseTimesToday.filter {
             calculatedDoseTimes.contains($0)
         }
