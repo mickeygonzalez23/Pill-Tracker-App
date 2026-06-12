@@ -201,6 +201,10 @@ enum MedicationIntentStore {
         }
     }
 
+    nonisolated static func medication(id medicationID: String) -> Medication? {
+        loadMedications().first { $0.id.uuidString == medicationID }
+    }
+
     nonisolated static func markMedication(id medicationID: String, as status: DoseStatus) -> String {
         var medications = loadMedications()
 
@@ -215,25 +219,9 @@ enum MedicationIntentStore {
         }
 
         let doseTimes = medications[index].displayDoseTimes
-        let todayKey = DoseHistory.dateKey(for: Date())
-        var todaysStatuses = medications[index].doseStatusHistory[todayKey] ?? [:]
-
-        switch status {
-        case .taken:
-            medications[index].takenDoseTimesToday = doseTimes
-            medications[index].unsureDoseTimesToday = []
-            doseTimes.forEach { todaysStatuses[$0] = DoseStatus.taken.rawValue }
-        case .unsure:
-            medications[index].takenDoseTimesToday = []
-            medications[index].unsureDoseTimesToday = doseTimes
-            doseTimes.forEach { todaysStatuses[$0] = DoseStatus.unsure.rawValue }
-        case .due:
-            medications[index].takenDoseTimesToday = []
-            medications[index].unsureDoseTimesToday = []
-            doseTimes.forEach { todaysStatuses.removeValue(forKey: $0) }
+        for doseTime in doseTimes {
+            apply(status, to: &medications[index], doseTime: doseTime)
         }
-
-        medications[index].doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
         saveMedications(medications)
 
         if status == .taken {
@@ -245,7 +233,6 @@ enum MedicationIntentStore {
 
     nonisolated static func markDoseNumber(_ doseNumber: DoseNumber, as status: DoseStatus) -> String {
         var medications = loadMedications()
-        let todayKey = DoseHistory.dateKey(for: Date())
         var updatedDoseNames: [String] = []
 
         for index in medications.indices where medications[index].isScheduled(on: Date()) {
@@ -256,32 +243,7 @@ enum MedicationIntentStore {
             }
 
             let doseTime = doseTimes[doseNumber.index]
-            var todaysStatuses = medications[index].doseStatusHistory[todayKey] ?? [:]
-
-            switch status {
-            case .taken:
-                medications[index].unsureDoseTimesToday.removeAll { $0 == doseTime }
-
-                if !medications[index].takenDoseTimesToday.contains(doseTime) {
-                    medications[index].takenDoseTimesToday.append(doseTime)
-                }
-
-                todaysStatuses[doseTime] = DoseStatus.taken.rawValue
-            case .unsure:
-                medications[index].takenDoseTimesToday.removeAll { $0 == doseTime }
-
-                if !medications[index].unsureDoseTimesToday.contains(doseTime) {
-                    medications[index].unsureDoseTimesToday.append(doseTime)
-                }
-
-                todaysStatuses[doseTime] = DoseStatus.unsure.rawValue
-            case .due:
-                medications[index].takenDoseTimesToday.removeAll { $0 == doseTime }
-                medications[index].unsureDoseTimesToday.removeAll { $0 == doseTime }
-                todaysStatuses.removeValue(forKey: doseTime)
-            }
-
-            medications[index].doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
+            apply(status, to: &medications[index], doseTime: doseTime)
             updatedDoseNames.append("\(medications[index].siriNickname) at \(doseTime)")
         }
 
@@ -291,6 +253,17 @@ enum MedicationIntentStore {
 
         saveMedications(medications)
         return "Marked your \(doseNumber.rawValue) dose as taken: \(updatedDoseNames.joined(separator: ", "))."
+    }
+
+    nonisolated static func markMedicationDose(id medicationID: String, doseTime: String, as status: DoseStatus) {
+        var medications = loadMedications()
+
+        guard let index = medications.firstIndex(where: { $0.id.uuidString == medicationID }) else {
+            return
+        }
+
+        apply(status, to: &medications[index], doseTime: doseTime)
+        saveMedications(medications)
     }
 
     nonisolated static func dueMedicationsSummary() -> String {
@@ -330,5 +303,35 @@ enum MedicationIntentStore {
         }
 
         UserDefaults.standard.set(data, forKey: storageKey)
+    }
+
+    nonisolated private static func apply(_ status: DoseStatus, to medication: inout Medication, doseTime: String) {
+        let todayKey = DoseHistory.dateKey(for: Date())
+        var todaysStatuses = medication.doseStatusHistory[todayKey] ?? [:]
+
+        switch status {
+        case .taken:
+            medication.unsureDoseTimesToday.removeAll { $0 == doseTime }
+
+            if !medication.takenDoseTimesToday.contains(doseTime) {
+                medication.takenDoseTimesToday.append(doseTime)
+            }
+
+            todaysStatuses[doseTime] = DoseStatus.taken.rawValue
+        case .unsure:
+            medication.takenDoseTimesToday.removeAll { $0 == doseTime }
+
+            if !medication.unsureDoseTimesToday.contains(doseTime) {
+                medication.unsureDoseTimesToday.append(doseTime)
+            }
+
+            todaysStatuses[doseTime] = DoseStatus.unsure.rawValue
+        case .due:
+            medication.takenDoseTimesToday.removeAll { $0 == doseTime }
+            medication.unsureDoseTimesToday.removeAll { $0 == doseTime }
+            todaysStatuses.removeValue(forKey: doseTime)
+        }
+
+        medication.doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
     }
 }

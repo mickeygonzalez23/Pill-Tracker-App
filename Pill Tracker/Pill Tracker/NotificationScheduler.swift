@@ -9,7 +9,40 @@ import Foundation
 import UserNotifications
 
 enum NotificationScheduler {
+    static let reminderCategoryIdentifier = "MEDICATION_REMINDER"
+    static let takenActionIdentifier = "MARK_TAKEN"
+    static let unsureActionIdentifier = "MARK_UNSURE"
+    static let snoozeActionIdentifier = "REMIND_LATER"
+
     private static let reminderPrefix = "medication-reminder-"
+    private static let snoozePrefix = "medication-snooze-"
+
+    static func registerCategories() {
+        let takenAction = UNNotificationAction(
+            identifier: takenActionIdentifier,
+            title: "Taken",
+            options: []
+        )
+        let unsureAction = UNNotificationAction(
+            identifier: unsureActionIdentifier,
+            title: "Not Sure",
+            options: []
+        )
+        let snoozeAction = UNNotificationAction(
+            identifier: snoozeActionIdentifier,
+            title: "Remind Me Later",
+            options: []
+        )
+
+        let category = UNNotificationCategory(
+            identifier: reminderCategoryIdentifier,
+            actions: [takenAction, unsureAction, snoozeAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([category])
+    }
 
     static func requestPermissionAndSchedule(for medications: [Medication]) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
@@ -60,6 +93,11 @@ enum NotificationScheduler {
                 content.title = "Pill Reminder"
                 content.body = "Time for \(medication.siriNickname) (\(medication.dose))."
                 content.sound = .default
+                content.categoryIdentifier = reminderCategoryIdentifier
+                content.userInfo = [
+                    "medicationID": medication.id.uuidString,
+                    "doseTime": doseTime
+                ]
 
                 var components = DateComponents()
                 components.weekday = weekday
@@ -93,5 +131,25 @@ enum NotificationScheduler {
         }
 
         return (hour, minute)
+    }
+
+    static func scheduleSnooze(medicationName: String, dose: String, medicationID: String, doseTime: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Pill Reminder"
+        content.body = "Checking back: \(medicationName) (\(dose))."
+        content.sound = .default
+        content.categoryIdentifier = reminderCategoryIdentifier
+        content.userInfo = [
+            "medicationID": medicationID,
+            "doseTime": doseTime
+        ]
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 10 * 60, repeats: false)
+        let identifier = "\(snoozePrefix)\(medicationID)-\(doseTime)-\(Date().timeIntervalSince1970)"
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: ":", with: "")
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+
+        UNUserNotificationCenter.current().add(request)
     }
 }

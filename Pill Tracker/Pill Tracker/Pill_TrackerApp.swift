@@ -9,6 +9,8 @@ import SwiftUI
 
 @main
 struct Pill_TrackerApp: App {
+    @UIApplicationDelegateAdaptor(NotificationResponseHandler.self) private var notificationResponseHandler
+
     var body: some Scene {
         WindowGroup {
             ContentView()
