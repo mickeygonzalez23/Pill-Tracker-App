@@ -265,6 +265,10 @@ final class MedicationStore: ObservableObject {
         medications.removeAll { $0.id == medication.id }
     }
 
+    func reload() {
+        load()
+    }
+
     private func load() {
         guard
             let data = UserDefaults.standard.data(forKey: storageKey),

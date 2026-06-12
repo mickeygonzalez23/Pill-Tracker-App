@@ -136,7 +136,17 @@ struct ContentView: View {
                 }
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            store.reload()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .medicationsDidChangeExternally)) { _ in
+            store.reload()
+        }
     }
+}
+
+extension Notification.Name {
+    nonisolated static let medicationsDidChangeExternally = Notification.Name("medicationsDidChangeExternally")
 }
 
 struct TodayView: View {
@@ -400,12 +410,7 @@ struct MedicationFormView: View {
     @State private var isShowingDeleteConfirmation = false
 
     private let intervalChoices = [1, 2, 3, 4, 6, 8, 12]
-    private let timeOptions = [
-        "12:00 AM", "1:00 AM", "2:00 AM", "3:00 AM", "4:00 AM", "5:00 AM",
-        "6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
-        "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM",
-        "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM", "11:00 PM"
-    ]
+    private let timeOptions = TimeOptionBuilder.fiveMinuteOptions
 
     init(
         title: String,
@@ -711,7 +716,7 @@ struct MedicationFormView: View {
             return []
         }
 
-        let step = max(intervalHours, 1)
+        let step = max(intervalHours, 1) * 12
         return stride(from: startIndex, through: endIndex, by: step).map { timeOptions[$0] }
     }
 
@@ -728,6 +733,25 @@ struct MedicationFormView: View {
     private func timeIndex(_ time: String) -> Int {
         timeOptions.firstIndex(of: time) ?? 0
     }
+}
+
+enum TimeOptionBuilder {
+    static let fiveMinuteOptions: [String] = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+
+        return stride(from: 0, to: 24 * 60, by: 5).compactMap { minuteOffset in
+            guard let date = calendar.date(byAdding: .minute, value: minuteOffset, to: startOfDay) else {
+                return nil
+            }
+
+            return formatter.string(from: date)
+        }
+    }()
 }
 
 struct TimeChipGrid: View {

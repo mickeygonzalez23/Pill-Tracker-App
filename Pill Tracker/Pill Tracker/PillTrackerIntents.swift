@@ -303,6 +303,7 @@ enum MedicationIntentStore {
         }
 
         UserDefaults.standard.set(data, forKey: storageKey)
+        NotificationCenter.default.post(name: .medicationsDidChangeExternally, object: nil)
     }
 
     nonisolated private static func apply(_ status: DoseStatus, to medication: inout Medication, doseTime: String) {
