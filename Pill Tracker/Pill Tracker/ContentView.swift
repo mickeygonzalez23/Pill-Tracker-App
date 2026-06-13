@@ -287,6 +287,40 @@ struct DoseRow: View {
         Array(medication.doseStatusLog(for: doseTime, on: Date()).suffix(3).reversed())
     }
 
+    private var displayStatusText: String {
+        guard status == .due else {
+            return status.rawValue
+        }
+
+        return doseTimingState?.title ?? status.rawValue
+    }
+
+    private var displayStatusColor: Color {
+        guard status == .due else {
+            return status.color
+        }
+
+        return doseTimingState?.color ?? status.color
+    }
+
+    private var doseTimingState: DoseTimingState? {
+        guard status == .due, let doseDate = DoseTimeParser.dateToday(from: doseTime) else {
+            return nil
+        }
+
+        let secondsFromDoseTime = Date().timeIntervalSince(doseDate)
+
+        if secondsFromDoseTime < -3_600 {
+            return .dueLaterToday
+        }
+
+        if secondsFromDoseTime <= 1_800 {
+            return .due
+        }
+
+        return .pastDue
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -295,13 +329,15 @@ struct DoseRow: View {
 
                 Spacer()
 
-                Text(status.rawValue)
-                    .font(.headline)
+                Text(displayStatusText)
+                    .font(.subheadline)
                     .fontWeight(.bold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(status.color.opacity(0.26))
-                    .foregroundStyle(status.color)
+                    .background(displayStatusColor.opacity(0.26))
+                    .foregroundStyle(displayStatusColor)
                     .clipShape(Capsule())
             }
 
@@ -421,6 +457,52 @@ struct DoseRow: View {
         var entries = todaysLog[doseTime] ?? []
         entries.append(DoseStatusLogEntry(status: status, changedAt: Date()))
         todaysLog[doseTime] = Array(entries.suffix(20))
+    }
+}
+
+enum DoseTimingState {
+    case dueLaterToday
+    case due
+    case pastDue
+
+    var title: String {
+        switch self {
+        case .dueLaterToday:
+            return "Due later today"
+        case .due:
+            return "Due"
+        case .pastDue:
+            return "Past due"
+        }
+    }
+
+    var color: Color {
+        DoseStatus.due.color
+    }
+}
+
+enum DoseTimeParser {
+    nonisolated static func dateToday(from time: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+
+        guard let parsedTime = formatter.date(from: time) else {
+            return nil
+        }
+
+        let calendar = Calendar.current
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: parsedTime)
+        let todayComponents = calendar.dateComponents([.year, .month, .day], from: Date())
+
+        var components = DateComponents()
+        components.year = todayComponents.year
+        components.month = todayComponents.month
+        components.day = todayComponents.day
+        components.hour = timeComponents.hour
+        components.minute = timeComponents.minute
+
+        return calendar.date(from: components)
     }
 }
 
