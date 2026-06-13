@@ -176,29 +176,54 @@ struct TodayView: View {
     @Binding var isShowingAddMedication: Bool
     let updateMedication: (Medication) -> Void
 
-    private var todaysMedications: [Medication] {
-        medications.filter { $0.isScheduled(on: Date()) }
+    private var todayDoseItems: [TodayDoseItem] {
+        medications
+            .filter { $0.isScheduled(on: Date()) }
+            .flatMap { medication in
+                medication.displayDoseTimes.map {
+                    TodayDoseItem(medication: medication, doseTime: $0)
+                }
+            }
+            .sorted { timeIndex($0.doseTime) < timeIndex($1.doseTime) }
+    }
+
+    private var takenCount: Int {
+        todayDoseItems.filter { $0.medication.doseStatus(for: $0.doseTime, on: Date()) == .taken }.count
+    }
+
+    private var unsureCount: Int {
+        todayDoseItems.filter { $0.medication.doseStatus(for: $0.doseTime, on: Date()) == .unsure }.count
+    }
+
+    private var dueCount: Int {
+        max(todayDoseItems.count - takenCount - unsureCount, 0)
     }
 
     var body: some View {
         NavigationStack {
             List {
-                if todaysMedications.isEmpty {
+                if todayDoseItems.isEmpty {
                     ContentUnavailableView(
                         medications.isEmpty ? "No Meds Yet" : "No Meds Today",
                         systemImage: "pills",
                         description: Text(medications.isEmpty ? "Tap the plus button to add your first medication." : "Nothing is scheduled for today.")
                     )
                 } else {
+                    Section {
+                        TodaySummaryView(
+                            takenCount: takenCount,
+                            unsureCount: unsureCount,
+                            dueCount: dueCount
+                        )
+                    }
+
                     Section("Today's Doses") {
-                        ForEach(todaysMedications) { medication in
-                            ForEach(medication.displayDoseTimes, id: \.self) { doseTime in
-                                DoseRow(
-                                    medication: medication,
-                                    doseTime: doseTime,
-                                    updateMedication: updateMedication
-                                )
-                            }
+                        ForEach(todayDoseItems) { item in
+                            DoseRow(
+                                medication: item.medication,
+                                doseTime: item.doseTime,
+                                updateMedication: updateMedication
+                            )
                         }
                     }
                 }
@@ -215,12 +240,41 @@ struct TodayView: View {
             }
         }
     }
+
+    private func timeIndex(_ time: String) -> Int {
+        TimeOptionBuilder.fiveMinuteOptions.firstIndex(of: time) ?? 0
+    }
+}
+
+struct TodayDoseItem: Identifiable {
+    let medication: Medication
+    let doseTime: String
+
+    var id: String {
+        "\(medication.id.uuidString)-\(doseTime)"
+    }
+}
+
+struct TodaySummaryView: View {
+    let takenCount: Int
+    let unsureCount: Int
+    let dueCount: Int
+
+    var body: some View {
+        HStack(spacing: 10) {
+            HistoryCountPill(title: "Taken", count: takenCount, color: DoseStatus.taken.color)
+            HistoryCountPill(title: "Not Sure", count: unsureCount, color: DoseStatus.unsure.color)
+            HistoryCountPill(title: "Due", count: dueCount, color: DoseStatus.due.color)
+        }
+        .padding(.vertical, 4)
+    }
 }
 
 struct DoseRow: View {
     let medication: Medication
     let doseTime: String
     let updateMedication: (Medication) -> Void
+    @State private var isShowingActivity = false
 
     private var status: DoseStatus {
         medication.doseStatus(for: doseTime, on: Date())
@@ -262,13 +316,17 @@ struct DoseRow: View {
             }
 
             if !recentLogEntries.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
-                    ForEach(recentLogEntries) { entry in
-                        Text("\(entry.status) at \(DoseHistory.displayUpdateTime(entry.changedAt))")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                DisclosureGroup("Recent activity", isExpanded: $isShowingActivity) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(recentLogEntries) { entry in
+                            Text("\(entry.status) at \(DoseHistory.displayUpdateTime(entry.changedAt))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             HStack {
@@ -276,7 +334,7 @@ struct DoseRow: View {
                     markTaken()
                 } label: {
                     Label(
-                        status == .taken ? "Undo" : "Mark Taken",
+                        status == .taken ? "Clear Taken" : "Mark Taken",
                         systemImage: status == .taken ? "arrow.uturn.backward.circle" : "checkmark.circle.fill"
                     )
                     .font(.caption)
@@ -290,7 +348,7 @@ struct DoseRow: View {
                     markUnsure()
                 } label: {
                     Label(
-                        status == .unsure ? "Clear" : "Not Sure",
+                        status == .unsure ? "Clear Not Sure" : "Not Sure",
                         systemImage: status == .unsure ? "xmark.circle" : "questionmark.circle"
                     )
                     .font(.caption)
