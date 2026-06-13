@@ -606,41 +606,101 @@ struct MedicationFormView: View {
         }
     }
 
+    private var saveGuidance: String? {
+        if trimmedRealName.isEmpty {
+            return "Add the medication name to save."
+        }
+
+        if trimmedDose.isEmpty {
+            return "Add the dose to save."
+        }
+
+        if trimmedNickname.isEmpty {
+            return "Add a private Siri name to save."
+        }
+
+        if nicknameAlreadyExists {
+            return "Choose a private Siri name that is not already being used."
+        }
+
+        if calculatedDoseTimes.isEmpty {
+            return "Choose at least one dose time."
+        }
+
+        if dayScheduleKind == .specificDays && selectedWeekdays.isEmpty {
+            return "Choose at least one day."
+        }
+
+        return nil
+    }
+
+    private var selectedDaysSummary: String {
+        switch dayScheduleKind {
+        case .everyDay:
+            return "Scheduled every day."
+        case .specificDays:
+            let days = Weekday.allCases
+                .filter { selectedWeekdays.contains($0.id) }
+                .map(\.shortName)
+                .joined(separator: ", ")
+
+            return days.isEmpty ? "No days selected." : "Scheduled on \(days)."
+        }
+    }
+
+    private var doseTimesSummary: String {
+        let times = calculatedDoseTimes
+
+        guard !times.isEmpty else {
+            return "No dose times selected."
+        }
+
+        return times.joined(separator: ", ")
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     formSection("Medication") {
-                    TextField("Real name", text: $realName)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Dose", text: $dose)
-                        .textFieldStyle(.roundedBorder)
-                }
+                        TextField("Medication name", text: $realName)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Dose, such as 10 mg", text: $dose)
+                            .textFieldStyle(.roundedBorder)
+                    }
 
                     formSection("Private Siri Name") {
-                    TextField("Example: sugar pill", text: $siriNickname)
-                        .textFieldStyle(.roundedBorder)
+                        TextField("Example: sugar pill", text: $siriNickname)
+                            .textFieldStyle(.roundedBorder)
 
-                    if nicknameAlreadyExists {
-                        Text("That Siri nickname is already being used.")
+                        Text("Use a private nickname for Siri instead of the real medication name.")
                             .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
+                            .foregroundStyle(.secondary)
 
-                    formSection("Days") {
-                    Toggle("Specific days", isOn: specificDaysBinding)
-
-                    if dayScheduleKind == .specificDays {
-                        WeekdayPicker(selectedWeekdays: $selectedWeekdays)
-
-                        if selectedWeekdays.isEmpty {
-                            Text("Choose at least one day.")
+                        if nicknameAlreadyExists {
+                            Text("That Siri nickname is already being used.")
                                 .font(.caption)
                                 .foregroundStyle(.red)
                         }
                     }
-                }
+
+                    formSection("Days") {
+                        Toggle("Only certain days", isOn: specificDaysBinding)
+
+                        Text(selectedDaysSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if dayScheduleKind == .specificDays {
+                            WeekdayPicker(selectedWeekdays: $selectedWeekdays)
+
+                            if selectedWeekdays.isEmpty {
+                                Text("Choose at least one day.")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
 
                     formSection("Reminders") {
                         Toggle("Send reminders", isOn: $remindersEnabled)
@@ -650,47 +710,58 @@ struct MedicationFormView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    formSection("Dose Time") {
-                    Picker("Schedule", selection: $scheduleKind) {
-                        ForEach(ScheduleKind.allCases) { schedule in
-                            Text(schedule.rawValue).tag(schedule)
-                        }
-                    }
-
-                    switch scheduleKind {
-                    case .onceDaily:
-                        timePicker("Time", selection: $doseTime)
-                    case .twiceDaily:
-                        timePicker("First dose", selection: $doseTime)
-                        timePicker("Second dose", selection: $secondDoseTime)
-                    case .specificTimes:
-                        timePicker("Add time", selection: $selectedSpecificTime)
-
-                        Button {
-                            addSpecificTime()
-                        } label: {
-                            Label("Add Time", systemImage: "plus.circle")
-                        }
-
-                        TimeChipGrid(
-                            times: calculatedDoseTimes,
-                            deleteTime: deleteSpecificTime
-                        )
-                    case .everyXHours:
-                        Picker("Every", selection: $intervalHours) {
-                            ForEach(intervalChoices, id: \.self) { hours in
-                                Text("\(hours) hour\(hours == 1 ? "" : "s")").tag(hours)
+                    formSection("Dose Schedule") {
+                        Picker("Schedule", selection: $scheduleKind) {
+                            ForEach(ScheduleKind.allCases) { schedule in
+                                Text(schedule.rawValue).tag(schedule)
                             }
                         }
 
-                        timePicker("Start", selection: $intervalStartTime)
-                        timePicker("End", selection: $intervalEndTime)
-
-                        Text(intervalSummary)
+                        Text(doseTimesSummary)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        switch scheduleKind {
+                        case .onceDaily:
+                            timePicker("Time", selection: $doseTime)
+                        case .twiceDaily:
+                            timePicker("First dose", selection: $doseTime)
+                            timePicker("Second dose", selection: $secondDoseTime)
+                        case .specificTimes:
+                            timePicker("Add time", selection: $selectedSpecificTime)
+
+                            Button {
+                                addSpecificTime()
+                            } label: {
+                                Label("Add Time", systemImage: "plus.circle")
+                            }
+
+                            TimeChipGrid(
+                                times: calculatedDoseTimes,
+                                deleteTime: deleteSpecificTime
+                            )
+                        case .everyXHours:
+                            Picker("Every", selection: $intervalHours) {
+                                ForEach(intervalChoices, id: \.self) { hours in
+                                    Text("\(hours) hour\(hours == 1 ? "" : "s")").tag(hours)
+                                }
+                            }
+
+                            timePicker("Start", selection: $intervalStartTime)
+                            timePicker("End", selection: $intervalEndTime)
+
+                            Text(intervalSummary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                }
+
+                    if let saveGuidance {
+                        Label(saveGuidance, systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
                     if medication != nil {
                         Button(role: .destructive) {
