@@ -1293,16 +1293,18 @@ struct SettingsView: View {
                 }
 
                 Section("Siri") {
+                    Text("Private Siri names help avoid saying real medication names out loud.")
                     Text("Allow Siri in iPhone Settings so voice logging can communicate with Pill Tracker.")
                     Text("To use Siri while your iPhone is locked, turn on Siri under Allow Access When Locked in Face ID & Passcode settings.")
                 }
 
-                Section("Privacy") {
-                    Text("Private Siri names help avoid saying real medication names out loud.")
-                    Text("Medication data is saved on this device.")
+                Section("Medical Disclaimer") {
+                    Text("This app is for personal medication tracking only. It is not medical advice and does not replace guidance from a doctor, pharmacist, or other healthcare provider.")
+                    Text("Medication names, doses, schedules, reminders, and history depend on information entered by the user.")
                 }
 
                 Section("Data") {
+                    Text("Medication data is saved on this device.")
                     Label("\(medicationCount) medication\(medicationCount == 1 ? "" : "s") saved", systemImage: "pills")
 
                     Button(role: .destructive) {
