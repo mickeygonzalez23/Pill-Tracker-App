@@ -112,7 +112,6 @@ struct ContentView: View {
                 medications: store.medications,
                 isShowingAddMedication: $isShowingAddMedication,
                 medicationToEdit: $medicationToEdit,
-                updateMedication: store.update,
                 deleteMedication: store.delete
             )
             .tabItem {
@@ -429,7 +428,6 @@ struct MedicationsView: View {
     let medications: [Medication]
     @Binding var isShowingAddMedication: Bool
     @Binding var medicationToEdit: Medication?
-    let updateMedication: (Medication) -> Void
     let deleteMedication: (Medication) -> Void
 
     var body: some View {
@@ -446,47 +444,10 @@ struct MedicationsView: View {
                         Button {
                             medicationToEdit = medication
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(medication.realName)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    Text("Siri name: \(medication.siriNickname)")
-                                        .foregroundStyle(.secondary)
-                                    Text("\(medication.dose) - \(medication.scheduleSummary)")
-                                        .foregroundStyle(.secondary)
-                                    Text(medication.daySummary)
-                                        .foregroundStyle(.secondary)
-                                    Label(
-                                        medication.remindersEnabled ? "Reminders on" : "Reminders off",
-                                        systemImage: medication.remindersEnabled ? "bell" : "bell.slash"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(medication.remindersEnabled ? .blue : .secondary)
-                                }
-
-                                Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote)
-                                    .foregroundStyle(.tertiary)
-                            }
+                            MedicationManagementRow(medication: medication)
                         }
                         .buttonStyle(.plain)
-                        .padding(.vertical, 6)
                         .swipeActions {
-                            Button {
-                                var updatedMedication = medication
-                                updatedMedication.isTakenToday.toggle()
-                                updateMedication(updatedMedication)
-                            } label: {
-                                Label(
-                                    medication.isTakenToday ? "Undo" : "Taken",
-                                    systemImage: medication.isTakenToday ? "arrow.uturn.backward.circle" : "checkmark.circle"
-                                )
-                            }
-                            .tint(.green)
-
                             Button(role: .destructive) {
                                 deleteMedication(medication)
                             } label: {
@@ -507,6 +468,57 @@ struct MedicationsView: View {
                 }
             }
         }
+    }
+}
+
+struct MedicationManagementRow: View {
+    let medication: Medication
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(medication.realName)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text("Private Siri name: \(medication.siriNickname)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 3)
+            }
+
+            VStack(alignment: .leading, spacing: 7) {
+                Label(medication.dose, systemImage: "pills")
+                Label(medication.scheduleSummary, systemImage: "clock")
+                Label(medication.daySummary, systemImage: "calendar")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            ReminderStatusBadge(enabled: medication.remindersEnabled)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+struct ReminderStatusBadge: View {
+    let enabled: Bool
+
+    var body: some View {
+        Label(enabled ? "Reminders On" : "Reminders Off", systemImage: enabled ? "bell.fill" : "bell.slash")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(enabled ? .blue : .secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background((enabled ? Color.blue : Color.secondary).opacity(0.12), in: Capsule())
     }
 }
 
