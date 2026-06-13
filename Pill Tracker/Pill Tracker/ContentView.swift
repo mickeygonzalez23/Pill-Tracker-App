@@ -36,6 +36,10 @@ enum DoseHistory {
     nonisolated static func displayDate(_ date: Date) -> String {
         date.formatted(.dateTime.weekday(.wide).month(.wide).day().year())
     }
+
+    nonisolated static func displayUpdateTime(_ date: Date) -> String {
+        date.formatted(.dateTime.hour().minute())
+    }
 }
 
 extension Medication {
@@ -75,6 +79,16 @@ extension Medication {
         }
 
         return .due
+    }
+
+    nonisolated func doseStatusUpdatedAt(for doseTime: String, on date: Date) -> Date? {
+        let key = DoseHistory.dateKey(for: date)
+        return doseStatusUpdatedAtHistory[key]?[doseTime]
+    }
+
+    nonisolated func doseStatusLog(for doseTime: String, on date: Date) -> [DoseStatusLogEntry] {
+        let key = DoseHistory.dateKey(for: date)
+        return doseStatusLogHistory[key]?[doseTime] ?? []
     }
 }
 
@@ -204,6 +218,14 @@ struct DoseRow: View {
         medication.doseStatus(for: doseTime, on: Date())
     }
 
+    private var updatedAt: Date? {
+        medication.doseStatusUpdatedAt(for: doseTime, on: Date())
+    }
+
+    private var recentLogEntries: [DoseStatusLogEntry] {
+        Array(medication.doseStatusLog(for: doseTime, on: Date()).suffix(3).reversed())
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -224,6 +246,22 @@ struct DoseRow: View {
 
             Text("\(medication.realName) - \(medication.dose) - \(doseTime)")
                 .foregroundStyle(.secondary)
+
+            if status != .due, let updatedAt {
+                Label("Updated \(DoseHistory.displayUpdateTime(updatedAt))", systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !recentLogEntries.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(recentLogEntries) { entry in
+                        Text("\(entry.status) at \(DoseHistory.displayUpdateTime(entry.changedAt))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
 
             HStack {
                 Button {
@@ -262,6 +300,8 @@ struct DoseRow: View {
         var updatedMedication = medication
         let todayKey = DoseHistory.dateKey(for: Date())
         var todaysStatuses = updatedMedication.doseStatusHistory[todayKey] ?? [:]
+        var todaysUpdatedAt = updatedMedication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
+        var todaysLog = updatedMedication.doseStatusLogHistory[todayKey] ?? [:]
 
         updatedMedication.unsureDoseTimesToday.removeAll { $0 == doseTime }
 
@@ -269,12 +309,18 @@ struct DoseRow: View {
             todaysStatuses[doseTime] == DoseStatus.taken.rawValue {
             updatedMedication.takenDoseTimesToday.removeAll { $0 == doseTime }
             todaysStatuses.removeValue(forKey: doseTime)
+            todaysUpdatedAt.removeValue(forKey: doseTime)
+            addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
         } else {
             updatedMedication.takenDoseTimesToday.append(doseTime)
             todaysStatuses[doseTime] = DoseStatus.taken.rawValue
+            todaysUpdatedAt[doseTime] = Date()
+            addLogEntry(DoseStatus.taken.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
         }
 
         updatedMedication.doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
+        updatedMedication.doseStatusUpdatedAtHistory[todayKey] = todaysUpdatedAt.isEmpty ? nil : todaysUpdatedAt
+        updatedMedication.doseStatusLogHistory[todayKey] = todaysLog.isEmpty ? nil : todaysLog
         updateMedication(updatedMedication)
     }
 
@@ -282,6 +328,8 @@ struct DoseRow: View {
         var updatedMedication = medication
         let todayKey = DoseHistory.dateKey(for: Date())
         var todaysStatuses = updatedMedication.doseStatusHistory[todayKey] ?? [:]
+        var todaysUpdatedAt = updatedMedication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
+        var todaysLog = updatedMedication.doseStatusLogHistory[todayKey] ?? [:]
 
         updatedMedication.takenDoseTimesToday.removeAll { $0 == doseTime }
 
@@ -289,13 +337,25 @@ struct DoseRow: View {
             todaysStatuses[doseTime] == DoseStatus.unsure.rawValue {
             updatedMedication.unsureDoseTimesToday.removeAll { $0 == doseTime }
             todaysStatuses.removeValue(forKey: doseTime)
+            todaysUpdatedAt.removeValue(forKey: doseTime)
+            addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
         } else {
             updatedMedication.unsureDoseTimesToday.append(doseTime)
             todaysStatuses[doseTime] = DoseStatus.unsure.rawValue
+            todaysUpdatedAt[doseTime] = Date()
+            addLogEntry(DoseStatus.unsure.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
         }
 
         updatedMedication.doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
+        updatedMedication.doseStatusUpdatedAtHistory[todayKey] = todaysUpdatedAt.isEmpty ? nil : todaysUpdatedAt
+        updatedMedication.doseStatusLogHistory[todayKey] = todaysLog.isEmpty ? nil : todaysLog
         updateMedication(updatedMedication)
+    }
+
+    private func addLogEntry(_ status: String, doseTime: String, todaysLog: inout [String: [DoseStatusLogEntry]]) {
+        var entries = todaysLog[doseTime] ?? []
+        entries.append(DoseStatusLogEntry(status: status, changedAt: Date()))
+        todaysLog[doseTime] = Array(entries.suffix(20))
     }
 }
 
@@ -672,6 +732,18 @@ struct MedicationFormView: View {
         }
         savedMedication.unsureDoseTimesToday = savedMedication.unsureDoseTimesToday.filter {
             calculatedDoseTimes.contains($0)
+        }
+        savedMedication.doseStatusHistory = savedMedication.doseStatusHistory.compactMapValues { statuses in
+            let filteredStatuses = statuses.filter { calculatedDoseTimes.contains($0.key) }
+            return filteredStatuses.isEmpty ? nil : filteredStatuses
+        }
+        savedMedication.doseStatusUpdatedAtHistory = savedMedication.doseStatusUpdatedAtHistory.compactMapValues { timestamps in
+            let filteredTimestamps = timestamps.filter { calculatedDoseTimes.contains($0.key) }
+            return filteredTimestamps.isEmpty ? nil : filteredTimestamps
+        }
+        savedMedication.doseStatusLogHistory = savedMedication.doseStatusLogHistory.compactMapValues { logs in
+            let filteredLogs = logs.filter { calculatedDoseTimes.contains($0.key) }
+            return filteredLogs.isEmpty ? nil : filteredLogs
         }
 
         onSave(savedMedication)
@@ -1097,6 +1169,14 @@ struct HistoryDoseRow: View {
         medication.doseStatus(for: doseTime, on: selectedDate)
     }
 
+    private var updatedAt: Date? {
+        medication.doseStatusUpdatedAt(for: doseTime, on: selectedDate)
+    }
+
+    private var logEntries: [DoseStatusLogEntry] {
+        medication.doseStatusLog(for: doseTime, on: selectedDate).reversed()
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -1105,6 +1185,23 @@ struct HistoryDoseRow: View {
                 Text("\(medication.realName) - \(medication.dose) - \(doseTime)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+
+                if status != .due, let updatedAt {
+                    Label("Updated \(DoseHistory.displayUpdateTime(updatedAt))", systemImage: "clock")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if !logEntries.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(logEntries) { entry in
+                            Text("\(entry.status) at \(DoseHistory.displayUpdateTime(entry.changedAt))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, 2)
+                }
             }
 
             Spacer()

@@ -309,6 +309,8 @@ enum MedicationIntentStore {
     nonisolated private static func apply(_ status: DoseStatus, to medication: inout Medication, doseTime: String) {
         let todayKey = DoseHistory.dateKey(for: Date())
         var todaysStatuses = medication.doseStatusHistory[todayKey] ?? [:]
+        var todaysUpdatedAt = medication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
+        var todaysLog = medication.doseStatusLogHistory[todayKey] ?? [:]
 
         switch status {
         case .taken:
@@ -319,6 +321,8 @@ enum MedicationIntentStore {
             }
 
             todaysStatuses[doseTime] = DoseStatus.taken.rawValue
+            todaysUpdatedAt[doseTime] = Date()
+            addLogEntry(DoseStatus.taken.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
         case .unsure:
             medication.takenDoseTimesToday.removeAll { $0 == doseTime }
 
@@ -327,12 +331,24 @@ enum MedicationIntentStore {
             }
 
             todaysStatuses[doseTime] = DoseStatus.unsure.rawValue
+            todaysUpdatedAt[doseTime] = Date()
+            addLogEntry(DoseStatus.unsure.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
         case .due:
             medication.takenDoseTimesToday.removeAll { $0 == doseTime }
             medication.unsureDoseTimesToday.removeAll { $0 == doseTime }
             todaysStatuses.removeValue(forKey: doseTime)
+            todaysUpdatedAt.removeValue(forKey: doseTime)
+            addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
         }
 
         medication.doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
+        medication.doseStatusUpdatedAtHistory[todayKey] = todaysUpdatedAt.isEmpty ? nil : todaysUpdatedAt
+        medication.doseStatusLogHistory[todayKey] = todaysLog.isEmpty ? nil : todaysLog
+    }
+
+    nonisolated private static func addLogEntry(_ status: String, doseTime: String, todaysLog: inout [String: [DoseStatusLogEntry]]) {
+        var entries = todaysLog[doseTime] ?? []
+        entries.append(DoseStatusLogEntry(status: status, changedAt: Date()))
+        todaysLog[doseTime] = Array(entries.suffix(20))
     }
 }

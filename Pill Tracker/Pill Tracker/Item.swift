@@ -8,6 +8,12 @@
 import Combine
 import Foundation
 
+struct DoseStatusLogEntry: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var status: String
+    var changedAt: Date
+}
+
 struct Medication: Identifiable, Codable, Equatable {
     var id = UUID()
     var realName: String
@@ -24,6 +30,8 @@ struct Medication: Identifiable, Codable, Equatable {
     var takenDoseTimesToday: [String] = []
     var unsureDoseTimesToday: [String] = []
     var doseStatusHistory: [String: [String: String]] = [:]
+    var doseStatusUpdatedAtHistory: [String: [String: Date]] = [:]
+    var doseStatusLogHistory: [String: [String: [DoseStatusLogEntry]]] = [:]
     var remindersEnabled = true
     var createdAt = Date()
 
@@ -87,6 +95,8 @@ struct Medication: Identifiable, Codable, Equatable {
         takenDoseTimesToday: [String] = [],
         unsureDoseTimesToday: [String] = [],
         doseStatusHistory: [String: [String: String]] = [:],
+        doseStatusUpdatedAtHistory: [String: [String: Date]] = [:],
+        doseStatusLogHistory: [String: [String: [DoseStatusLogEntry]]] = [:],
         remindersEnabled: Bool = true,
         createdAt: Date = Date()
     ) {
@@ -105,6 +115,8 @@ struct Medication: Identifiable, Codable, Equatable {
         self.takenDoseTimesToday = takenDoseTimesToday
         self.unsureDoseTimesToday = unsureDoseTimesToday
         self.doseStatusHistory = doseStatusHistory
+        self.doseStatusUpdatedAtHistory = doseStatusUpdatedAtHistory
+        self.doseStatusLogHistory = doseStatusLogHistory
         self.remindersEnabled = remindersEnabled
         self.createdAt = createdAt
     }
@@ -125,6 +137,8 @@ struct Medication: Identifiable, Codable, Equatable {
         case takenDoseTimesToday
         case unsureDoseTimesToday
         case doseStatusHistory
+        case doseStatusUpdatedAtHistory
+        case doseStatusLogHistory
         case remindersEnabled
         case isTakenToday
         case createdAt
@@ -147,6 +161,8 @@ struct Medication: Identifiable, Codable, Equatable {
         takenDoseTimesToday = try container.decodeIfPresent([String].self, forKey: .takenDoseTimesToday) ?? []
         unsureDoseTimesToday = try container.decodeIfPresent([String].self, forKey: .unsureDoseTimesToday) ?? []
         doseStatusHistory = try container.decodeIfPresent([String: [String: String]].self, forKey: .doseStatusHistory) ?? [:]
+        doseStatusUpdatedAtHistory = try container.decodeIfPresent([String: [String: Date]].self, forKey: .doseStatusUpdatedAtHistory) ?? [:]
+        doseStatusLogHistory = try container.decodeIfPresent([String: [String: [DoseStatusLogEntry]]].self, forKey: .doseStatusLogHistory) ?? [:]
         remindersEnabled = try container.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
 
@@ -172,6 +188,8 @@ struct Medication: Identifiable, Codable, Equatable {
         try container.encode(takenDoseTimesToday, forKey: .takenDoseTimesToday)
         try container.encode(unsureDoseTimesToday, forKey: .unsureDoseTimesToday)
         try container.encode(doseStatusHistory, forKey: .doseStatusHistory)
+        try container.encode(doseStatusUpdatedAtHistory, forKey: .doseStatusUpdatedAtHistory)
+        try container.encode(doseStatusLogHistory, forKey: .doseStatusLogHistory)
         try container.encode(remindersEnabled, forKey: .remindersEnabled)
         try container.encode(createdAt, forKey: .createdAt)
     }
