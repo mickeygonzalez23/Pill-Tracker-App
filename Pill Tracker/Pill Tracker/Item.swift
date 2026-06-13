@@ -287,6 +287,12 @@ final class MedicationStore: ObservableObject {
         load()
     }
 
+    func resetAllData() {
+        medications = []
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        NotificationScheduler.cancelMedicationReminders()
+    }
+
     private func load() {
         guard
             let data = UserDefaults.standard.data(forKey: storageKey),

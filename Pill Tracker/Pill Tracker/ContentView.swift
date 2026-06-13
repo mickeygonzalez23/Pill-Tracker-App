@@ -128,6 +128,14 @@ struct ContentView: View {
                 .tabItem {
                     Label("Siri", systemImage: "waveform")
                 }
+
+            SettingsView(
+                medicationCount: store.medications.count,
+                resetAllData: store.resetAllData
+            )
+            .tabItem {
+                Label("Settings", systemImage: "gearshape")
+            }
         }
         .sheet(isPresented: $isShowingAddMedication) {
             MedicationFormView(
@@ -1267,6 +1275,57 @@ struct SiriView: View {
                 }
             }
             .navigationTitle("Siri")
+        }
+    }
+}
+
+struct SettingsView: View {
+    let medicationCount: Int
+    let resetAllData: () -> Void
+
+    @State private var isShowingResetConfirmation = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Notifications") {
+                    Text("Allow notifications in iPhone Settings to receive reminders.")
+                }
+
+                Section("Siri") {
+                    Text("Allow Siri in iPhone Settings so voice logging can communicate with Pill Tracker.")
+                    Text("To use Siri while your iPhone is locked, turn on Siri under Allow Access When Locked in Face ID & Passcode settings.")
+                }
+
+                Section("Privacy") {
+                    Text("Private Siri names help avoid saying real medication names out loud.")
+                    Text("Medication data is saved on this device.")
+                }
+
+                Section("Data") {
+                    Label("\(medicationCount) medication\(medicationCount == 1 ? "" : "s") saved", systemImage: "pills")
+
+                    Button(role: .destructive) {
+                        isShowingResetConfirmation = true
+                    } label: {
+                        Label("Delete All Medications & History", systemImage: "trash")
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+            .confirmationDialog(
+                "Delete All Medications & History?",
+                isPresented: $isShowingResetConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Everything", role: .destructive) {
+                    resetAllData()
+                }
+
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes all saved medications, history, and pending reminders.")
+            }
         }
     }
 }

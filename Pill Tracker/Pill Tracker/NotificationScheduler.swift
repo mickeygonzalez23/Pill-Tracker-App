@@ -64,6 +64,18 @@ enum NotificationScheduler {
         }
     }
 
+    static func cancelMedicationReminders() {
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            let reminderIDs = requests
+                .map(\.identifier)
+                .filter {
+                    $0.hasPrefix(reminderPrefix) || $0.hasPrefix(snoozePrefix)
+                }
+
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: reminderIDs)
+        }
+    }
+
     private static func replaceMedicationReminders(with medications: [Medication]) {
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
             let existingReminderIDs = requests
