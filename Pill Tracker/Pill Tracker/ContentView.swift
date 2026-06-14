@@ -1466,35 +1466,55 @@ struct SiriView: View {
         NavigationStack {
             List {
                 Section("Siri Actions") {
-                    if medications.isEmpty {
-                        Text("Add a medication to make Siri actions available.")
-                    } else {
-                        ForEach(medications) { medication in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(medication.siriNickname)
-                                    .font(.headline)
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("How to Log a Pill as Taken or Not Sure")
+                                .font(.headline)
 
-                                Text("I took \(medication.siriNickname) in Pill Tracker")
-                                Text("I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
+                            if medications.isEmpty {
+                                Text("Add a medication to make Siri actions available.")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(medications) { medication in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(medication.siriNickname)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+
+                                        Text("I took \(medication.siriNickname) in Pill Tracker")
+                                        Text("I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
+                                    }
+                                    .padding(.vertical, 2)
+                                }
                             }
-                            .padding(.vertical, 4)
                         }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("How to Check Medication Status")
+                                .font(.headline)
+
+                            Text("Pill Tracker status report")
+                            Text("Pill Tracker medication status")
+                            Text("Pill Tracker pill status")
+                        }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Multiple Daily Doses")
+                                .font(.headline)
+
+                            Text("When one dose clearly matches the current time, Siri logs that dose for the medication you name.")
+                            Text("If multiple close doses are unlogged, Siri will name the possible times and ask you to choose.")
+                        }
+
+                        Text("* Always verify that Siri logged your dictations correctly.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                }
-
-                Section("Check Due") {
-                    Text("Did I take my pills in Pill Tracker")
-                    Text("What meds are due in Pill Tracker")
-                }
-
-                Section("Dose Number") {
-                    Text("I took my first dose today in Pill Tracker")
-                    Text("I took my second dose today in Pill Tracker")
-                    Text("Mark my third dose as taken in Pill Tracker")
-                }
-
-                Section("Privacy") {
-                    Text("Siri uses nicknames instead of real medication names.")
+                    .padding(.vertical, 4)
                 }
             }
             .navigationTitle("Siri")

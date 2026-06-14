@@ -5,6 +5,7 @@
 //  Created by Jose Gonzalez on 6/11/26.
 //
 
+import AppIntents
 import Combine
 import Foundation
 
@@ -310,5 +311,6 @@ final class MedicationStore: ObservableObject {
         }
 
         UserDefaults.standard.set(data, forKey: storageKey)
+        PillTrackerShortcuts.updateAppShortcutParameters()
     }
 }
