@@ -1015,16 +1015,6 @@ struct MedicationFormView: View {
         }
     }
 
-    private var doseTimesSummary: String {
-        let times = calculatedDoseTimes
-
-        guard !times.isEmpty else {
-            return "No dose times selected."
-        }
-
-        return times.joined(separator: ", ")
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -1036,18 +1026,47 @@ struct MedicationFormView: View {
                             .textFieldStyle(.roundedBorder)
                     }
 
-                    formSection("Private Siri Name") {
-                        TextField("Example: sugar pill", text: $siriNickname)
-                            .textFieldStyle(.roundedBorder)
+                    formSection("Dose Schedule") {
+                        Picker("Schedule", selection: $scheduleKind) {
+                            ForEach(ScheduleKind.allCases) { schedule in
+                                Text(schedule.rawValue).tag(schedule)
+                            }
+                        }
 
-                        Text("Use a private nickname for Siri instead of the real medication name.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if scheduleKind == .specificTimes {
+                            DoseTimesPreview(times: calculatedDoseTimes, deleteTime: deleteSpecificTime)
+                        } else {
+                            DoseTimesPreview(times: calculatedDoseTimes)
+                        }
 
-                        if nicknameAlreadyExists {
-                            Text("That Siri nickname is already being used.")
+                        switch scheduleKind {
+                        case .onceDaily:
+                            timePicker("Time", selection: $doseTime)
+                        case .twiceDaily:
+                            timePicker("First dose", selection: $doseTime)
+                            timePicker("Second dose", selection: $secondDoseTime)
+                        case .specificTimes:
+                            timePicker("Add time", selection: $selectedSpecificTime)
+
+                            Button {
+                                addSpecificTime()
+                            } label: {
+                                Label("Add Time", systemImage: "plus.circle")
+                            }
+
+                        case .everyXHours:
+                            Picker("Every", selection: $intervalHours) {
+                                ForEach(intervalChoices, id: \.self) { hours in
+                                    Text("\(hours) hour\(hours == 1 ? "" : "s")").tag(hours)
+                                }
+                            }
+
+                            timePicker("Start", selection: $intervalStartTime)
+                            timePicker("End", selection: $intervalEndTime)
+
+                            Text(intervalSummary)
                                 .font(.caption)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(.secondary)
                         }
                     }
 
@@ -1077,49 +1096,18 @@ struct MedicationFormView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    formSection("Dose Schedule") {
-                        Picker("Schedule", selection: $scheduleKind) {
-                            ForEach(ScheduleKind.allCases) { schedule in
-                                Text(schedule.rawValue).tag(schedule)
-                            }
-                        }
+                    formSection("Private Siri Name") {
+                        TextField("Example: sugar pill", text: $siriNickname)
+                            .textFieldStyle(.roundedBorder)
 
-                        Text(doseTimesSummary)
+                        Text("Use a private nickname for Siri instead of the real medication name.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                        switch scheduleKind {
-                        case .onceDaily:
-                            timePicker("Time", selection: $doseTime)
-                        case .twiceDaily:
-                            timePicker("First dose", selection: $doseTime)
-                            timePicker("Second dose", selection: $secondDoseTime)
-                        case .specificTimes:
-                            timePicker("Add time", selection: $selectedSpecificTime)
-
-                            Button {
-                                addSpecificTime()
-                            } label: {
-                                Label("Add Time", systemImage: "plus.circle")
-                            }
-
-                            TimeChipGrid(
-                                times: calculatedDoseTimes,
-                                deleteTime: deleteSpecificTime
-                            )
-                        case .everyXHours:
-                            Picker("Every", selection: $intervalHours) {
-                                ForEach(intervalChoices, id: \.self) { hours in
-                                    Text("\(hours) hour\(hours == 1 ? "" : "s")").tag(hours)
-                                }
-                            }
-
-                            timePicker("Start", selection: $intervalStartTime)
-                            timePicker("End", selection: $intervalEndTime)
-
-                            Text(intervalSummary)
+                        if nicknameAlreadyExists {
+                            Text("That Siri nickname is already being used.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.red)
                         }
                     }
 
@@ -1183,17 +1171,38 @@ struct MedicationFormView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
+            Label(title, systemImage: sectionIcon(for: title))
                 .font(.headline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.accent)
 
             VStack(alignment: .leading, spacing: 12) {
                 content()
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.background)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(AppTheme.accent.opacity(0.10), lineWidth: 1)
+            )
+        }
+    }
+
+    private func sectionIcon(for title: String) -> String {
+        switch title {
+        case "Medication":
+            return "pills"
+        case "Dose Schedule":
+            return "clock"
+        case "Days":
+            return "calendar"
+        case "Reminders":
+            return "bell"
+        case "Private Siri Name":
+            return "waveform"
+        default:
+            return "circle"
         }
     }
 
@@ -1330,34 +1339,49 @@ enum TimeOptionBuilder {
     }()
 }
 
-struct TimeChipGrid: View {
+struct DoseTimesPreview: View {
     let times: [String]
-    let deleteTime: (String) -> Void
+    var deleteTime: ((String) -> Void)?
 
     private let columns = [
-        GridItem(.adaptive(minimum: 92), spacing: 8)
+        GridItem(.adaptive(minimum: 96), spacing: 8)
     ]
 
     var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-            ForEach(times, id: \.self) { time in
-                Button(role: .destructive) {
-                    deleteTime(time)
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(time)
-                            .font(.caption)
-                            .fontWeight(.semibold)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(times.isEmpty ? "No dose times selected." : "\(times.count) scheduled dose\(times.count == 1 ? "" : "s")")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.caption)
+            if !times.isEmpty {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                    ForEach(times, id: \.self) { time in
+                        if let deleteTime {
+                            Button {
+                                deleteTime(time)
+                            } label: {
+                                timeChip(time, icon: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Remove \(time)")
+                        } else {
+                            timeChip(time, icon: "clock")
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
                 }
-                .buttonStyle(.bordered)
             }
         }
+    }
+
+    private func timeChip(_ time: String, icon: String) -> some View {
+        Label(time, systemImage: icon)
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(AppTheme.accent)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(AppTheme.softAccent, in: Capsule())
     }
 }
 
@@ -1737,63 +1761,94 @@ struct SiriView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Siri Actions") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("How to Log a Pill as Taken or Not Sure")
-                                .font(.headline)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Siri Actions")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
 
-                            if medications.isEmpty {
-                                Text("Add a medication to make Siri actions available.")
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                ForEach(medications) { medication in
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(medication.siriNickname)
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
+                    SiriInstructionCard(title: "How to Log a Pill as Taken or Not Sure", icon: "checkmark.bubble") {
+                        if medications.isEmpty {
+                            Text("Add a medication to make Siri actions available.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(medications) { medication in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(medication.siriNickname)
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
 
-                                        Text("Hey Siri, I took \(medication.siriNickname) in Pill Tracker")
-                                        Text("Hey Siri, I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
-                                    }
-                                    .padding(.vertical, 2)
+                                    SiriPhraseText("Hey Siri, I took \(medication.siriNickname) in Pill Tracker")
+                                    SiriPhraseText("Hey Siri, I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
                                 }
+                                .padding(.vertical, 2)
                             }
                         }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("How to Check Medication Status")
-                                .font(.headline)
-
-                            Text("Hey Siri, Pill Tracker status report")
-                            Text("Hey Siri, Pill Tracker medication status")
-                            Text("Hey Siri, Pill Tracker pill status")
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Multiple Daily Doses")
-                                .font(.headline)
-
-                            Text("When one dose clearly matches the current time, Siri logs that dose for the medication you name.")
-                            Text("If multiple close doses are unlogged, Siri will ask which dose and include the scheduled times, such as first dose at 8:00 AM or second dose at 12:00 PM.")
-                        }
-
-                        Text("* Always verify that Siri logged your dictations correctly.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 4)
+
+                    SiriInstructionCard(title: "How to Check Medication Status", icon: "list.bullet.clipboard") {
+                        SiriPhraseText("Hey Siri, Pill Tracker status report")
+                        SiriPhraseText("Hey Siri, Pill Tracker medication status")
+                        SiriPhraseText("Hey Siri, Pill Tracker pill status")
+                    }
+
+                    SiriInstructionCard(title: "Multiple Daily Doses", icon: "clock.badge.questionmark") {
+                        Text("When one dose clearly matches the current time, Siri logs that dose for the medication you name.")
+                        Text("If multiple close doses are unlogged, Siri will ask which dose and include the scheduled times, such as first dose at 8:00 AM or second dose at 12:00 PM.")
+                    }
+
+                    Text("* Always verify that Siri logged your dictations correctly.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                 }
+                .padding()
             }
             .navigationTitle("Siri")
-            .scrollContentBackground(.hidden)
             .background(AppTheme.pageBackground)
         }
+    }
+}
+
+struct SiriInstructionCard<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+                .foregroundStyle(AppTheme.accent)
+
+            VStack(alignment: .leading, spacing: 8) {
+                content
+            }
+            .font(.subheadline)
+            .foregroundStyle(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(AppTheme.accent.opacity(0.10), lineWidth: 1)
+        )
+    }
+}
+
+struct SiriPhraseText: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 2)
     }
 }
 
