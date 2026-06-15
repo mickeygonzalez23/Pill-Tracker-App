@@ -327,11 +327,16 @@ struct TodayView: View {
         NavigationStack {
             List {
                 if todayDoseItems.isEmpty {
-                    ContentUnavailableView(
-                        medications.isEmpty ? "No Meds Yet" : "No Meds Today",
-                        systemImage: "pills",
-                        description: Text(medications.isEmpty ? "Tap the plus button to add your first medication." : "Nothing is scheduled for today.")
+                    EmptyStateView(
+                        icon: medications.isEmpty ? "pills.circle" : "checkmark.seal",
+                        title: medications.isEmpty ? "No Meds Yet" : "No Meds Today",
+                        message: medications.isEmpty ? "Add a medication to start tracking doses, reminders, Siri logging, and history." : "Nothing is scheduled for today. Check History for past doses or add another medication.",
+                        actionTitle: medications.isEmpty ? "Add Medication" : nil,
+                        action: medications.isEmpty ? {
+                            isShowingAddMedication = true
+                        } : nil
                     )
+                    .listRowBackground(Color.clear)
                 } else {
                     Section {
                         TodaySummaryView(
@@ -391,6 +396,46 @@ struct TodaySummaryView: View {
             HistoryCountPill(title: "Due", count: dueCount, color: DoseStatus.due.color)
         }
         .padding(.vertical, 4)
+    }
+}
+
+struct EmptyStateView: View {
+    let icon: String
+    let title: String
+    let message: String
+    var actionTitle: String?
+    var action: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 46))
+                .foregroundStyle(.blue)
+
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.bold)
+
+                Text(message)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let actionTitle, let action {
+                Button(action: action) {
+                    Label(actionTitle, systemImage: "plus.circle.fill")
+                        .fontWeight(.semibold)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.top, 4)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 36)
+        .padding(.horizontal)
     }
 }
 
@@ -641,11 +686,16 @@ struct MedicationsView: View {
         NavigationStack {
             List {
                 if medications.isEmpty {
-                    ContentUnavailableView(
-                        "No Medications",
-                        systemImage: "pills",
-                        description: Text("Add a medication to start tracking doses.")
+                    EmptyStateView(
+                        icon: "pills.circle",
+                        title: "No Medications",
+                        message: "Add your first medication, choose its schedule, and decide whether reminders should be on.",
+                        actionTitle: "Add Medication",
+                        action: {
+                            isShowingAddMedication = true
+                        }
                     )
+                    .listRowBackground(Color.clear)
                 } else {
                     ForEach(medications) { medication in
                         Button {
