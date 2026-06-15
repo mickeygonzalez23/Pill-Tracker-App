@@ -492,10 +492,16 @@ struct DoseRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(medication.siriNickname)
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(medication.siriNickname)
+                        .font(.headline)
+
+                    Text(medication.realName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
@@ -511,8 +517,10 @@ struct DoseRow: View {
                     .clipShape(Capsule())
             }
 
-            Text("\(medication.realName) - \(medication.dose) - \(doseTime)")
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                DoseDetailChip(icon: "clock", text: doseTime)
+                DoseDetailChip(icon: "pills", text: medication.dose)
+            }
 
             if status != .due, let updatedAt {
                 Label("Updated \(DoseHistory.displayUpdateTime(updatedAt))", systemImage: "clock")
@@ -564,7 +572,7 @@ struct DoseRow: View {
                 .tint(status == .unsure ? .secondary : DoseStatus.unsure.color)
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 
     private func markTaken() {
@@ -627,6 +635,22 @@ struct DoseRow: View {
         var entries = todaysLog[doseTime] ?? []
         entries.append(DoseStatusLogEntry(status: status, changedAt: Date()))
         todaysLog[doseTime] = Array(entries.suffix(20))
+    }
+}
+
+struct DoseDetailChip: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        Label(text, systemImage: icon)
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
     }
 }
 
