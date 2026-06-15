@@ -94,6 +94,7 @@ extension Medication {
 
 struct ContentView: View {
     @StateObject private var store = MedicationStore()
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var isShowingAddMedication = false
     @State private var medicationToEdit: Medication?
 
@@ -157,6 +158,30 @@ struct ContentView: View {
                 }
             )
         }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: {
+                    !hasCompletedOnboarding && store.medications.isEmpty
+                },
+                set: { isPresented in
+                    if !isPresented {
+                        hasCompletedOnboarding = true
+                    }
+                }
+            )
+        ) {
+            OnboardingView(
+                addFirstMedication: {
+                    hasCompletedOnboarding = true
+                    DispatchQueue.main.async {
+                        isShowingAddMedication = true
+                    }
+                },
+                continueToApp: {
+                    hasCompletedOnboarding = true
+                }
+            )
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             store.reload()
         }
@@ -168,6 +193,106 @@ struct ContentView: View {
 
 extension Notification.Name {
     nonisolated static let medicationsDidChangeExternally = Notification.Name("medicationsDidChangeExternally")
+}
+
+struct OnboardingView: View {
+    let addFirstMedication: () -> Void
+    let continueToApp: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 28) {
+                Spacer(minLength: 24)
+
+                Image(systemName: "pills.circle.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(.blue)
+
+                VStack(spacing: 10) {
+                    Text("Pill Tracker")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+
+                    Text("Track scheduled doses, reminders, Siri logging, and daily history on this iPhone.")
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    OnboardingFeatureRow(
+                        icon: "clock.badge.checkmark",
+                        title: "Dose schedules",
+                        text: "Set daily, selected-day, or repeated dose times."
+                    )
+
+                    OnboardingFeatureRow(
+                        icon: "bell.badge",
+                        title: "Optional reminders",
+                        text: "Turn reminders on only for the meds that need them."
+                    )
+
+                    OnboardingFeatureRow(
+                        icon: "waveform",
+                        title: "Siri shortcuts",
+                        text: "Use private Siri names and verify logged results."
+                    )
+                }
+                .padding()
+                .background(.background)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                Spacer()
+
+                VStack(spacing: 12) {
+                    Button {
+                        addFirstMedication()
+                    } label: {
+                        Label("Add First Medication", systemImage: "plus.circle.fill")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+
+                    Button("Continue to App") {
+                        continueToApp()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                }
+            }
+            .padding()
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Welcome")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+struct OnboardingFeatureRow: View {
+    let icon: String
+    let title: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.blue)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.headline)
+
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
 }
 
 struct TodayView: View {
