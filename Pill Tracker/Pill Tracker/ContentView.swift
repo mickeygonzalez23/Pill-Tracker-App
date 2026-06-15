@@ -1022,7 +1022,7 @@ struct MedicationFormView: View {
                     formSection("Medication") {
                         TextField("Medication name", text: $realName)
                             .textFieldStyle(.roundedBorder)
-                        TextField("Dose, such as 10 mg", text: $dose)
+                        TextField("Dose, such as 2 pills or 10 mg", text: $dose)
                             .textFieldStyle(.roundedBorder)
                     }
 
