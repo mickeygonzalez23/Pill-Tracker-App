@@ -7,6 +7,12 @@
 
 import SwiftUI
 
+enum AppTheme {
+    static let accent = Color(red: 0.12, green: 0.58, blue: 0.72)
+    static let softAccent = Color(red: 0.82, green: 0.95, blue: 0.98)
+    static let pageBackground = Color(red: 0.91, green: 0.97, blue: 0.99)
+}
+
 enum DoseStatus: String, Codable {
     case due = "Due"
     case taken = "Taken"
@@ -206,7 +212,7 @@ struct OnboardingView: View {
 
                 Image(systemName: "pills.circle.fill")
                     .font(.system(size: 72))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(AppTheme.accent)
 
                 VStack(spacing: 10) {
                     Text("Pill Tracker")
@@ -264,7 +270,7 @@ struct OnboardingView: View {
                 }
             }
             .padding()
-            .background(Color(.systemGroupedBackground))
+            .background(AppTheme.pageBackground)
             .navigationTitle("Welcome")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -280,7 +286,7 @@ struct OnboardingFeatureRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(.blue)
+                .foregroundStyle(AppTheme.accent)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -344,6 +350,8 @@ struct TodayView: View {
                             unsureCount: unsureCount,
                             dueCount: dueCount
                         )
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
                     }
 
                     Section("Today's Doses") {
@@ -354,10 +362,15 @@ struct TodayView: View {
                                 updateMedication: updateMedication
                             )
                         }
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+                        .listRowBackground(Color.clear)
                     }
                 }
             }
             .navigationTitle("Today")
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.pageBackground)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -389,13 +402,52 @@ struct TodaySummaryView: View {
     let unsureCount: Int
     let dueCount: Int
 
+    private var totalCount: Int {
+        takenCount + unsureCount + dueCount
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            HistoryCountPill(title: "Taken", count: takenCount, color: DoseStatus.taken.color)
-            HistoryCountPill(title: "Not Sure", count: unsureCount, color: DoseStatus.unsure.color)
-            HistoryCountPill(title: "Due", count: dueCount, color: DoseStatus.due.color)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Today's Progress")
+                        .font(.headline)
+
+                    Text("\(takenCount) of \(totalCount) dose\(totalCount == 1 ? "" : "s") marked taken")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(totalCount == 0 ? "0%" : "\(Int((Double(takenCount) / Double(totalCount)) * 100))%")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(DoseStatus.taken.color)
+            }
+
+            ProgressView(value: Double(takenCount), total: Double(max(totalCount, 1)))
+                .tint(DoseStatus.taken.color)
+
+            HStack(spacing: 10) {
+                HistoryCountPill(title: "Taken", count: takenCount, color: DoseStatus.taken.color)
+                HistoryCountPill(title: "Not Sure", count: unsureCount, color: DoseStatus.unsure.color)
+                HistoryCountPill(title: "Due", count: dueCount, color: DoseStatus.due.color)
+            }
         }
-        .padding(.vertical, 4)
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [AppTheme.softAccent, Color(.systemBackground)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppTheme.accent.opacity(0.14), lineWidth: 1)
+        )
     }
 }
 
@@ -410,7 +462,7 @@ struct EmptyStateView: View {
         VStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 46))
-                .foregroundStyle(.blue)
+                .foregroundStyle(AppTheme.accent)
 
             VStack(spacing: 6) {
                 Text(title)
@@ -443,7 +495,6 @@ struct DoseRow: View {
     let medication: Medication
     let doseTime: String
     let updateMedication: (Medication) -> Void
-    @State private var isShowingActivity = false
 
     private var status: DoseStatus {
         medication.doseStatus(for: doseTime, on: Date())
@@ -451,10 +502,6 @@ struct DoseRow: View {
 
     private var updatedAt: Date? {
         medication.doseStatusUpdatedAt(for: doseTime, on: Date())
-    }
-
-    private var recentLogEntries: [DoseStatusLogEntry] {
-        Array(medication.doseStatusLog(for: doseTime, on: Date()).suffix(3).reversed())
     }
 
     private var displayStatusText: String {
@@ -494,6 +541,12 @@ struct DoseRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
+                Image(systemName: statusIcon)
+                    .font(.title3)
+                    .foregroundStyle(displayStatusColor)
+                    .frame(width: 32, height: 32)
+                    .background(displayStatusColor.opacity(0.14), in: Circle())
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(medication.siriNickname)
                         .font(.headline)
@@ -528,20 +581,6 @@ struct DoseRow: View {
                     .foregroundStyle(.secondary)
             }
 
-            if !recentLogEntries.isEmpty {
-                DisclosureGroup("Recent activity", isExpanded: $isShowingActivity) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(recentLogEntries) { entry in
-                            Text("\(entry.status) at \(DoseHistory.displayUpdateTime(entry.changedAt))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
             HStack {
                 Button {
                     markTaken()
@@ -555,7 +594,7 @@ struct DoseRow: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .tint(status == .taken ? .secondary : .blue)
+                .tint(status == .taken ? .secondary : AppTheme.accent)
 
                 Button {
                     markUnsure()
@@ -572,7 +611,31 @@ struct DoseRow: View {
                 .tint(status == .unsure ? .secondary : DoseStatus.unsure.color)
             }
         }
-        .padding(.vertical, 8)
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    private var statusIcon: String {
+        switch status {
+        case .taken:
+            return "checkmark.circle.fill"
+        case .unsure:
+            return "questionmark.circle.fill"
+        case .due:
+            switch doseTimingState {
+            case .pastDue:
+                return "exclamationmark.circle.fill"
+            case .dueLaterToday:
+                return "clock.fill"
+            case .due, .none:
+                return "bell.circle.fill"
+            }
+        }
     }
 
     private func markTaken() {
@@ -728,6 +791,9 @@ struct MedicationsView: View {
                             MedicationManagementRow(medication: medication)
                         }
                         .buttonStyle(.plain)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+                        .listRowBackground(Color.clear)
                         .swipeActions {
                             Button(role: .destructive) {
                                 deleteMedication(medication)
@@ -739,6 +805,8 @@ struct MedicationsView: View {
                 }
             }
             .navigationTitle("Meds")
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.pageBackground)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -786,7 +854,13 @@ struct MedicationManagementRow: View {
 
             ReminderStatusBadge(enabled: medication.remindersEnabled)
         }
-        .padding(.vertical, 8)
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 
@@ -796,10 +870,10 @@ struct ReminderStatusBadge: View {
     var body: some View {
         Label(enabled ? "Reminders On" : "Reminders Off", systemImage: enabled ? "bell.fill" : "bell.slash")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(enabled ? .blue : .secondary)
+            .foregroundStyle(enabled ? AppTheme.accent : .secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background((enabled ? Color.blue : Color.secondary).opacity(0.12), in: Capsule())
+            .background((enabled ? AppTheme.accent : Color.secondary).opacity(0.12), in: Capsule())
     }
 }
 
@@ -1070,7 +1144,7 @@ struct MedicationFormView: View {
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .background(AppTheme.pageBackground)
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
@@ -1310,7 +1384,7 @@ struct WeekdayPicker: View {
                         .padding(.vertical, 8)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(selectedWeekdays.contains(weekday.id) ? .blue : .secondary)
+                .tint(selectedWeekdays.contains(weekday.id) ? AppTheme.accent : .secondary)
             }
         }
         .padding(.vertical, 4)
@@ -1397,7 +1471,7 @@ struct HistoryView: View {
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .background(AppTheme.pageBackground)
             .navigationTitle("History")
         }
     }
@@ -1554,7 +1628,7 @@ struct HistoryDayButton: View {
                     .font(.subheadline)
                     .fontWeight(isSelected ? .bold : .regular)
                     .frame(width: 34, height: 30)
-                    .background(isSelected ? Color.blue : Color.clear)
+                    .background(isSelected ? AppTheme.accent : Color.clear)
                     .foregroundStyle(isSelected ? .white : .primary)
                     .clipShape(Circle())
 
@@ -1680,8 +1754,8 @@ struct SiriView: View {
                                             .font(.subheadline)
                                             .fontWeight(.semibold)
 
-                                        Text("I took \(medication.siriNickname) in Pill Tracker")
-                                        Text("I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
+                                        Text("Hey Siri, I took \(medication.siriNickname) in Pill Tracker")
+                                        Text("Hey Siri, I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
                                     }
                                     .padding(.vertical, 2)
                                 }
@@ -1694,9 +1768,9 @@ struct SiriView: View {
                             Text("How to Check Medication Status")
                                 .font(.headline)
 
-                            Text("Pill Tracker status report")
-                            Text("Pill Tracker medication status")
-                            Text("Pill Tracker pill status")
+                            Text("Hey Siri, Pill Tracker status report")
+                            Text("Hey Siri, Pill Tracker medication status")
+                            Text("Hey Siri, Pill Tracker pill status")
                         }
 
                         Divider()
@@ -1717,6 +1791,8 @@ struct SiriView: View {
                 }
             }
             .navigationTitle("Siri")
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.pageBackground)
         }
     }
 }
@@ -1757,6 +1833,8 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.pageBackground)
             .confirmationDialog(
                 "Delete All Medications & History?",
                 isPresented: $isShowingResetConfirmation,
