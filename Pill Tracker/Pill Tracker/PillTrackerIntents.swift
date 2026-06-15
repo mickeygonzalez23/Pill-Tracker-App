@@ -56,57 +56,6 @@ struct MedicationEntityQuery: EntityStringQuery {
     }
 }
 
-struct DoseTimeEntity: AppEntity {
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Dose Time")
-    static var defaultQuery = DoseTimeEntityQuery()
-
-    let id: String
-    let time: String
-
-    var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(time)")
-    }
-}
-
-struct DoseTimeEntityQuery: EntityStringQuery {
-    func entities(for identifiers: [DoseTimeEntity.ID]) async throws -> [DoseTimeEntity] {
-        identifiers.map { DoseTimeEntity(id: $0, time: $0) }
-    }
-
-    func entities(matching string: String) async throws -> [DoseTimeEntity] {
-        doseTimeOptions
-            .filter { normalized($0).contains(normalized(string)) }
-            .map { DoseTimeEntity(id: $0, time: $0) }
-    }
-
-    func suggestedEntities() async throws -> [DoseTimeEntity] {
-        doseTimeOptions.map { DoseTimeEntity(id: $0, time: $0) }
-    }
-
-    private var doseTimeOptions: [String] {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "h:mm a"
-
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: Date())
-
-        return stride(from: 0, to: 24 * 60, by: 5).compactMap { minuteOffset in
-            guard let date = calendar.date(byAdding: .minute, value: minuteOffset, to: startOfDay) else {
-                return nil
-            }
-
-            return formatter.string(from: date)
-        }
-    }
-
-    private func normalized(_ text: String) -> String {
-        text
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-    }
-}
-
 enum DoseNumber: String, AppEnum {
     case first
     case second
@@ -114,15 +63,27 @@ enum DoseNumber: String, AppEnum {
     case fourth
     case fifth
     case sixth
+    case seventh
+    case eighth
+    case ninth
+    case tenth
+    case eleventh
+    case twelfth
 
     static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Dose Number")
     static var caseDisplayRepresentations: [DoseNumber: DisplayRepresentation] = [
-        .first: "first",
-        .second: "second",
-        .third: "third",
-        .fourth: "fourth",
-        .fifth: "fifth",
-        .sixth: "sixth"
+        .first: "Dose 1",
+        .second: "Dose 2",
+        .third: "Dose 3",
+        .fourth: "Dose 4",
+        .fifth: "Dose 5",
+        .sixth: "Dose 6",
+        .seventh: "Dose 7",
+        .eighth: "Dose 8",
+        .ninth: "Dose 9",
+        .tenth: "Dose 10",
+        .eleventh: "Dose 11",
+        .twelfth: "Dose 12"
     ]
 
     var index: Int {
@@ -139,6 +100,18 @@ enum DoseNumber: String, AppEnum {
             return 4
         case .sixth:
             return 5
+        case .seventh:
+            return 6
+        case .eighth:
+            return 7
+        case .ninth:
+            return 8
+        case .tenth:
+            return 9
+        case .eleventh:
+            return 10
+        case .twelfth:
+            return 11
         }
     }
 }
@@ -151,17 +124,17 @@ struct MarkMedicationTakenIntent: AppIntent {
     @Parameter(title: "Medication")
     var medication: MedicationEntity
 
-    @Parameter(title: "Dose Time")
-    var doseTime: DoseTimeEntity?
+    @Parameter(title: "Dose")
+    var doseNumber: DoseNumber?
 
     init() {
         medication = MedicationEntity(id: "", name: "", realName: "")
-        doseTime = nil
+        doseNumber = nil
     }
 
     init(medication: MedicationEntity) {
         self.medication = medication
-        doseTime = nil
+        doseNumber = nil
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -170,21 +143,20 @@ struct MarkMedicationTakenIntent: AppIntent {
     }
 
     private func markDose(as status: DoseStatus) async throws -> String {
-        let selection = MedicationIntentStore.doseSelection(for: medication.id, selectedDoseTime: doseTime?.time)
+        let selection = MedicationIntentStore.doseSelection(for: medication.id, selectedDoseNumber: doseNumber)
 
         if let message = selection.message {
             return message
         }
 
         if selection.needsChoice {
-            let options = selection.candidateDoseTimes.map { DoseTimeEntity(id: $0, time: $0) }
-            let selectedDoseTime = try await $doseTime.requestDisambiguation(
-                among: options,
-                dialog: "Which dose time?"
+            let selectedDoseNumber = try await $doseNumber.requestDisambiguation(
+                among: selection.candidateDoseNumbers,
+                dialog: IntentDialog(stringLiteral: selection.choicePrompt ?? "Which dose?")
             )
-            return MedicationIntentStore.markMedicationDoseWithMessage(
+            return MedicationIntentStore.markMedicationDoseNumberWithMessage(
                 id: medication.id,
-                doseTime: selectedDoseTime.time,
+                doseNumber: selectedDoseNumber,
                 as: status
             )
         }
@@ -205,17 +177,17 @@ struct MarkMedicationUnsureIntent: AppIntent {
     @Parameter(title: "Medication")
     var medication: MedicationEntity
 
-    @Parameter(title: "Dose Time")
-    var doseTime: DoseTimeEntity?
+    @Parameter(title: "Dose")
+    var doseNumber: DoseNumber?
 
     init() {
         medication = MedicationEntity(id: "", name: "", realName: "")
-        doseTime = nil
+        doseNumber = nil
     }
 
     init(medication: MedicationEntity) {
         self.medication = medication
-        doseTime = nil
+        doseNumber = nil
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -224,21 +196,20 @@ struct MarkMedicationUnsureIntent: AppIntent {
     }
 
     private func markDose(as status: DoseStatus) async throws -> String {
-        let selection = MedicationIntentStore.doseSelection(for: medication.id, selectedDoseTime: doseTime?.time)
+        let selection = MedicationIntentStore.doseSelection(for: medication.id, selectedDoseNumber: doseNumber)
 
         if let message = selection.message {
             return message
         }
 
         if selection.needsChoice {
-            let options = selection.candidateDoseTimes.map { DoseTimeEntity(id: $0, time: $0) }
-            let selectedDoseTime = try await $doseTime.requestDisambiguation(
-                among: options,
-                dialog: "Which dose time?"
+            let selectedDoseNumber = try await $doseNumber.requestDisambiguation(
+                among: selection.candidateDoseNumbers,
+                dialog: IntentDialog(stringLiteral: selection.choicePrompt ?? "Which dose?")
             )
-            return MedicationIntentStore.markMedicationDoseWithMessage(
+            return MedicationIntentStore.markMedicationDoseNumberWithMessage(
                 id: medication.id,
-                doseTime: selectedDoseTime.time,
+                doseNumber: selectedDoseNumber,
                 as: status
             )
         }
@@ -250,7 +221,6 @@ struct MarkMedicationUnsureIntent: AppIntent {
         return MedicationIntentStore.markMedicationDoseWithMessage(id: medication.id, doseTime: doseTime, as: status)
     }
 }
-
 struct CheckDueMedicationsIntent: AppIntent {
     static var title: LocalizedStringResource = "Pill Tracker Status"
     static var description = IntentDescription("Gives a status report for medications still due today.")
@@ -309,8 +279,9 @@ enum MedicationIntentStore {
 
     struct DoseSelection {
         var doseTime: String?
-        var candidateDoseTimes: [String]
+        var candidateDoseNumbers: [DoseNumber]
         var needsChoice: Bool
+        var choicePrompt: String?
         var message: String?
     }
 
@@ -351,53 +322,57 @@ enum MedicationIntentStore {
     }
 
     nonisolated static func markNextMedicationDose(id medicationID: String, as status: DoseStatus) -> String {
-        let selection = doseSelection(for: medicationID, selectedDoseTime: nil)
+        let selection = doseSelection(for: medicationID, selectedDoseNumber: nil)
 
         if let message = selection.message {
             return message
         }
 
         guard let doseTime = selection.doseTime, !selection.needsChoice else {
-            return "Please choose which dose time to log."
+            return "Please choose which dose to log."
         }
 
         return markMedicationDoseWithMessage(id: medicationID, doseTime: doseTime, as: status)
     }
 
-    nonisolated static func doseSelection(for medicationID: String, selectedDoseTime: String?) -> DoseSelection {
+    nonisolated static func doseSelection(for medicationID: String, selectedDoseNumber: DoseNumber?) -> DoseSelection {
         let medications = loadMedications()
 
         guard let index = medications.firstIndex(where: { $0.id.uuidString == medicationID }) else {
-            return DoseSelection(doseTime: nil, candidateDoseTimes: [], needsChoice: false, message: "I could not find that medication.")
+            return DoseSelection(doseTime: nil, candidateDoseNumbers: [], needsChoice: false, choicePrompt: nil, message: "I could not find that medication.")
         }
 
         guard medications[index].isScheduled(on: Date()) else {
-            return DoseSelection(doseTime: nil, candidateDoseTimes: [], needsChoice: false, message: "\(medications[index].siriNickname) is not scheduled for today.")
+            return DoseSelection(doseTime: nil, candidateDoseNumbers: [], needsChoice: false, choicePrompt: nil, message: "\(medications[index].siriNickname) is not scheduled for today.")
         }
 
+        let doseTimes = medications[index].displayDoseTimes
         let unloggedDoseTimes = medications[index].displayDoseTimes.filter {
             medications[index].doseStatus(for: $0, on: Date()) == .due
         }
 
-        if let selectedDoseTime {
-            guard medications[index].displayDoseTimes.contains(selectedDoseTime) else {
-                return DoseSelection(doseTime: nil, candidateDoseTimes: [], needsChoice: false, message: "\(medications[index].siriNickname) does not have a dose scheduled at \(selectedDoseTime).")
+        if let selectedDoseNumber {
+            guard doseTimes.indices.contains(selectedDoseNumber.index) else {
+                return DoseSelection(doseTime: nil, candidateDoseNumbers: [], needsChoice: false, choicePrompt: nil, message: "\(medications[index].siriNickname) does not have Dose \(selectedDoseNumber.index + 1) scheduled today.")
             }
+
+            let selectedDoseTime = doseTimes[selectedDoseNumber.index]
 
             guard unloggedDoseTimes.contains(selectedDoseTime) else {
-                return DoseSelection(doseTime: nil, candidateDoseTimes: [], needsChoice: false, message: "\(medications[index].siriNickname) at \(selectedDoseTime) is already logged today.")
+                return DoseSelection(doseTime: nil, candidateDoseNumbers: [], needsChoice: false, choicePrompt: nil, message: "\(medications[index].siriNickname)'s Dose \(selectedDoseNumber.index + 1) at \(selectedDoseTime) is already logged today.")
             }
 
-            return DoseSelection(doseTime: selectedDoseTime, candidateDoseTimes: [selectedDoseTime], needsChoice: false, message: nil)
+            return DoseSelection(doseTime: selectedDoseTime, candidateDoseNumbers: [selectedDoseNumber], needsChoice: false, choicePrompt: nil, message: nil)
         }
 
-        let doseSelection = doseTimeToLog(from: unloggedDoseTimes)
+        let doseSelection = doseTimeToLog(from: unloggedDoseTimes, scheduledDoseTimes: doseTimes)
 
         if let message = doseSelection.message {
             return DoseSelection(
                 doseTime: nil,
-                candidateDoseTimes: doseSelection.candidateDoseTimes,
+                candidateDoseNumbers: doseSelection.candidateDoseNumbers,
                 needsChoice: doseSelection.needsChoice,
+                choicePrompt: doseSelection.choicePrompt,
                 message: message.replacingOccurrences(of: "{medication}", with: medications[index].siriNickname)
             )
         }
@@ -407,6 +382,20 @@ enum MedicationIntentStore {
 
     nonisolated static func markMedicationDose(id medicationID: String, doseTime: String, as status: DoseStatus) {
         _ = markMedicationDoseWithMessage(id: medicationID, doseTime: doseTime, as: status)
+    }
+
+    nonisolated static func markMedicationDoseNumberWithMessage(id medicationID: String, doseNumber: DoseNumber, as status: DoseStatus) -> String {
+        let selection = doseSelection(for: medicationID, selectedDoseNumber: doseNumber)
+
+        if let message = selection.message {
+            return message
+        }
+
+        guard let doseTime = selection.doseTime else {
+            return "I could not find a dose to log."
+        }
+
+        return markMedicationDoseWithMessage(id: medicationID, doseTime: doseTime, as: status)
     }
 
     nonisolated static func markMedicationDoseWithMessage(id medicationID: String, doseTime: String, as status: DoseStatus) -> String {
@@ -446,13 +435,13 @@ enum MedicationIntentStore {
         return "Still due today: \(dueDoseNames.joined(separator: ", "))."
     }
 
-    nonisolated private static func doseTimeToLog(from doseTimes: [String]) -> DoseSelection {
+    nonisolated private static func doseTimeToLog(from doseTimes: [String], scheduledDoseTimes: [String]) -> DoseSelection {
         let sortedDoseTimes = doseTimes.sorted { first, second in
             dateToday(from: first) ?? .distantFuture < dateToday(from: second) ?? .distantFuture
         }
 
         guard !sortedDoseTimes.isEmpty else {
-            return DoseSelection(doseTime: nil, candidateDoseTimes: [], needsChoice: false, message: "All doses for {medication} are already logged today.")
+            return DoseSelection(doseTime: nil, candidateDoseNumbers: [], needsChoice: false, choicePrompt: nil, message: "All doses for {medication} are already logged today.")
         }
 
         let now = Date()
@@ -465,14 +454,38 @@ enum MedicationIntentStore {
         }
 
         if relevantDoseTimes.count > 1 {
-            return DoseSelection(doseTime: nil, candidateDoseTimes: relevantDoseTimes, needsChoice: true, message: nil)
+            let candidateDoseNumbers = doseNumbers(for: relevantDoseTimes, scheduledDoseTimes: scheduledDoseTimes)
+            let prompt = doseChoicePrompt(for: candidateDoseNumbers, scheduledDoseTimes: scheduledDoseTimes)
+            return DoseSelection(doseTime: nil, candidateDoseNumbers: candidateDoseNumbers, needsChoice: true, choicePrompt: prompt, message: nil)
         }
 
         if let doseTime = relevantDoseTimes.first {
-            return DoseSelection(doseTime: doseTime, candidateDoseTimes: [doseTime], needsChoice: false, message: nil)
+            return DoseSelection(doseTime: doseTime, candidateDoseNumbers: doseNumbers(for: [doseTime], scheduledDoseTimes: scheduledDoseTimes), needsChoice: false, choicePrompt: nil, message: nil)
         }
 
-        return DoseSelection(doseTime: sortedDoseTimes.first, candidateDoseTimes: sortedDoseTimes, needsChoice: false, message: nil)
+        return DoseSelection(doseTime: sortedDoseTimes.first, candidateDoseNumbers: doseNumbers(for: sortedDoseTimes, scheduledDoseTimes: scheduledDoseTimes), needsChoice: false, choicePrompt: nil, message: nil)
+    }
+
+    nonisolated private static func doseNumbers(for doseTimes: [String], scheduledDoseTimes: [String]) -> [DoseNumber] {
+        doseTimes.compactMap { doseTime in
+            guard let index = scheduledDoseTimes.firstIndex(of: doseTime) else {
+                return nil
+            }
+
+            return DoseNumber.allCases.first { $0.index == index }
+        }
+    }
+
+    nonisolated private static func doseChoicePrompt(for doseNumbers: [DoseNumber], scheduledDoseTimes: [String]) -> String {
+        let choices = doseNumbers.compactMap { doseNumber -> String? in
+            guard scheduledDoseTimes.indices.contains(doseNumber.index) else {
+                return nil
+            }
+
+            return "Dose \(doseNumber.index + 1) at \(scheduledDoseTimes[doseNumber.index])"
+        }
+
+        return "Which dose? \(choices.joined(separator: ", "))."
     }
 
     nonisolated private static func dateToday(from time: String) -> Date? {

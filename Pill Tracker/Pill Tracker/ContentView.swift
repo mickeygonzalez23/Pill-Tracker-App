@@ -1507,7 +1507,7 @@ struct SiriView: View {
                                 .font(.headline)
 
                             Text("When one dose clearly matches the current time, Siri logs that dose for the medication you name.")
-                            Text("If multiple close doses are unlogged, Siri will name the possible times and ask you to choose.")
+                            Text("If multiple close doses are unlogged, Siri will ask which dose and include the scheduled times, such as first dose at 8:00 AM or second dose at 12:00 PM.")
                         }
 
                         Text("* Always verify that Siri logged your dictations correctly.")
