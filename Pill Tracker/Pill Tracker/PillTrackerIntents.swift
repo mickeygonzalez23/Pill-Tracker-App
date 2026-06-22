@@ -118,7 +118,7 @@ enum DoseNumber: String, AppEnum {
 
 struct MarkMedicationTakenIntent: AppIntent {
     static var title: LocalizedStringResource = "Mark Medication Taken"
-    static var description = IntentDescription("Marks the next relevant dose for a medication as taken using its private Siri name.")
+    static var description = IntentDescription("Marks the next relevant dose for a medication as taken using its private medication nickname.")
     static var openAppWhenRun = false
 
     @Parameter(title: "Medication")
@@ -171,7 +171,7 @@ struct MarkMedicationTakenIntent: AppIntent {
 
 struct MarkMedicationUnsureIntent: AppIntent {
     static var title: LocalizedStringResource = "Mark Medication Not Sure"
-    static var description = IntentDescription("Marks the next relevant dose for a medication as not sure using its private Siri name.")
+    static var description = IntentDescription("Marks the next relevant dose for a medication as not sure using its private medication nickname.")
     static var openAppWhenRun = false
 
     @Parameter(title: "Medication")
