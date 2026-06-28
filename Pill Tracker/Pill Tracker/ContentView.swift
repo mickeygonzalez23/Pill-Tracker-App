@@ -130,9 +130,9 @@ struct ContentView: View {
                     Label("History", systemImage: "calendar")
                 }
 
-            SiriView(medications: store.medications)
+            ShortcutsView(medications: store.medications)
                 .tabItem {
-                    Label("Siri", systemImage: "waveform")
+                    Label("Shortcuts", systemImage: "sparkles")
                 }
 
             SettingsView(
@@ -219,7 +219,7 @@ struct OnboardingView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
-                    Text("Track scheduled doses, reminders, Siri logging, and daily history on this iPhone.")
+                    Text("Track scheduled doses, reminders, shortcut logging, and daily history on this iPhone.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
@@ -241,8 +241,8 @@ struct OnboardingView: View {
 
                     OnboardingFeatureRow(
                         icon: "waveform",
-                        title: "Siri shortcuts",
-                        text: "Use private Siri names and verify logged results."
+                        title: "Shortcut logging",
+                        text: "Use private nicknames and verify logged results."
                     )
                 }
                 .padding()
@@ -336,7 +336,7 @@ struct TodayView: View {
                     EmptyStateView(
                         icon: medications.isEmpty ? "pills.circle" : "checkmark.seal",
                         title: medications.isEmpty ? "No Meds Yet" : "No Meds Today",
-                        message: medications.isEmpty ? "Add a medication to start tracking doses, reminders, Siri logging, and history." : "Nothing is scheduled for today. Check History for past doses or add another medication.",
+                        message: medications.isEmpty ? "Add a medication to start tracking doses, reminders, shortcut logging, and history." : "Nothing is scheduled for today. Check History for past doses or add another medication.",
                         actionTitle: medications.isEmpty ? "Add Medication" : nil,
                         action: medications.isEmpty ? {
                             isShowingAddMedication = true
@@ -831,7 +831,7 @@ struct MedicationManagementRow: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
 
-                    Text("Private Siri name: \(medication.siriNickname)")
+                    Text("Private shortcut name: \(medication.siriNickname)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -983,11 +983,11 @@ struct MedicationFormView: View {
         }
 
         if trimmedNickname.isEmpty {
-            return "Add a private Siri name to save."
+            return "Add a private shortcut name to save."
         }
 
         if nicknameAlreadyExists {
-            return "Choose a private Siri name that is not already being used."
+            return "Choose a private shortcut name that is not already being used."
         }
 
         if calculatedDoseTimes.isEmpty {
@@ -1096,16 +1096,16 @@ struct MedicationFormView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    formSection("Private Siri Name") {
+                    formSection("Private Shortcut Name") {
                         TextField("Example: sugar pill", text: $siriNickname)
                             .textFieldStyle(.roundedBorder)
 
-                        Text("Use a private nickname for Siri instead of the real medication name.")
+                        Text("Use a private nickname for shortcut logging instead of the real medication name.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
                         if nicknameAlreadyExists {
-                            Text("That Siri nickname is already being used.")
+                            Text("That shortcut nickname is already being used.")
                                 .font(.caption)
                                 .foregroundStyle(.red)
                         }
@@ -1199,7 +1199,7 @@ struct MedicationFormView: View {
             return "calendar"
         case "Reminders":
             return "bell"
-        case "Private Siri Name":
+        case "Private Shortcut Name":
             return "waveform"
         default:
             return "circle"
@@ -1756,20 +1756,20 @@ extension Calendar {
     }
 }
 
-struct SiriView: View {
+struct ShortcutsView: View {
     let medications: [Medication]
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Siri Actions")
+                    Text("Shortcut Actions")
                         .font(.headline)
                         .foregroundStyle(.secondary)
 
-                    SiriInstructionCard(title: "How to Log a Pill as Taken or Not Sure", icon: "checkmark.bubble") {
+                    ShortcutInstructionCard(title: "How to Log a Pill as Taken or Not Sure", icon: "checkmark.bubble") {
                         if medications.isEmpty {
-                            Text("Add a medication to make Siri actions available.")
+                            Text("Add a medication to make shortcut actions available.")
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach(medications) { medication in
@@ -1778,39 +1778,39 @@ struct SiriView: View {
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
 
-                                    SiriPhraseText("Hey Siri, I took \(medication.siriNickname) in Pill Tracker")
-                                    SiriPhraseText("Hey Siri, I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
+                                    ShortcutPhraseText("I took \(medication.siriNickname) in Pill Tracker")
+                                    ShortcutPhraseText("I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
                                 }
                                 .padding(.vertical, 2)
                             }
                         }
                     }
 
-                    SiriInstructionCard(title: "How to Check Medication Status", icon: "list.bullet.clipboard") {
-                        SiriPhraseText("Hey Siri, Pill Tracker status report")
-                        SiriPhraseText("Hey Siri, Pill Tracker medication status")
-                        SiriPhraseText("Hey Siri, Pill Tracker pill status")
+                    ShortcutInstructionCard(title: "How to Check Medication Status", icon: "list.bullet.clipboard") {
+                        ShortcutPhraseText("Pill Tracker status report")
+                        ShortcutPhraseText("Pill Tracker medication status")
+                        ShortcutPhraseText("Pill Tracker pill status")
                     }
 
-                    SiriInstructionCard(title: "Multiple Daily Doses", icon: "clock.badge.questionmark") {
-                        Text("When one dose clearly matches the current time, Siri logs that dose for the medication you name.")
-                        Text("If multiple close doses are unlogged, Siri will ask which dose and include the scheduled times, such as first dose at 8:00 AM or second dose at 12:00 PM.")
+                    ShortcutInstructionCard(title: "Multiple Daily Doses", icon: "clock.badge.questionmark") {
+                        Text("When one dose clearly matches the current time, the shortcut logs that dose for the medication you name.")
+                        Text("If multiple close doses are unlogged, the shortcut asks which dose and includes the scheduled times, such as first dose at 8:00 AM or second dose at 12:00 PM.")
                     }
 
-                    Text("* Always verify that Siri logged your dictations correctly.")
+                    Text("* Always verify that shortcut logging saved the correct dose.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 2)
                 }
                 .padding()
             }
-            .navigationTitle("Siri")
+            .navigationTitle("Shortcuts")
             .background(AppTheme.pageBackground)
         }
     }
 }
 
-struct SiriInstructionCard<Content: View>: View {
+struct ShortcutInstructionCard<Content: View>: View {
     let title: String
     let icon: String
     @ViewBuilder let content: Content
@@ -1838,7 +1838,7 @@ struct SiriInstructionCard<Content: View>: View {
     }
 }
 
-struct SiriPhraseText: View {
+struct ShortcutPhraseText: View {
     let text: String
 
     init(_ text: String) {
@@ -1865,10 +1865,10 @@ struct SettingsView: View {
                     Text("Allow notifications in iPhone Settings to receive reminders.")
                 }
 
-                Section("Siri") {
-                    Text("Private Siri names help avoid saying real medication names out loud.")
-                    Text("Allow Siri in iPhone Settings so voice logging can communicate with Pill Tracker.")
-                    Text("To use Siri while your iPhone is locked, turn on Siri under Allow Access When Locked in Face ID & Passcode settings.")
+                Section("Shortcuts") {
+                    Text("Private shortcut names help avoid saying real medication names out loud.")
+                    Text("Shortcut logging works through iOS system shortcuts.")
+                    Text("To run shortcuts while your iPhone is locked, allow shortcut access in iPhone Settings.")
                 }
 
                 Section("Medical Disclaimer") {
