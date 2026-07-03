@@ -132,7 +132,7 @@ struct ContentView: View {
 
             ShortcutsView(medications: store.medications)
                 .tabItem {
-                    Label("Shortcuts", systemImage: "sparkles")
+                    Label("Shortcuts", systemImage: "waveform")
                 }
 
             SettingsView(
