@@ -1,10 +1,10 @@
-# Privacy Policy for Pill Tracker Voice Log
+# Privacy Policy for Pill Tracker  Log
 
 Effective date: June 22, 2026
 
-Pill Tracker Voice Log is designed for personal medication tracking.
+Pill Tracker Log is designed for personal medication tracking.
 
-The app stores medication names, private medication nicknames, dose schedules, reminder settings, and dose history on your device. This information is used only to provide the app's tracking, reminder, notification, and shortcut features.
+The app stores all user-entered information, such as, medication names, private medication nicknames, dose schedules, reminder settings, and dose history on your device. This information is used only to provide the app's tracking, reminder, notification, and shortcut features.
 
 The app does not collect, transmit, sell, or share personal data with the developer or third parties. The app does not use analytics, advertising networks, account sign-in, or external servers.
 
