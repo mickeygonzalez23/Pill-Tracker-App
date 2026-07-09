@@ -74,16 +74,6 @@ extension Medication {
             return status
         }
 
-        if Calendar.current.isDateInToday(date) {
-            if takenDoseTimesToday.contains(doseTime) {
-                return .taken
-            }
-
-            if unsureDoseTimesToday.contains(doseTime) {
-                return .unsure
-            }
-        }
-
         return .due
     }
 
@@ -645,11 +635,10 @@ struct DoseRow: View {
         var todaysUpdatedAt = updatedMedication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
         var todaysLog = updatedMedication.doseStatusLogHistory[todayKey] ?? [:]
 
+        updatedMedication.takenDoseTimesToday.removeAll { $0 == doseTime }
         updatedMedication.unsureDoseTimesToday.removeAll { $0 == doseTime }
 
-        if updatedMedication.takenDoseTimesToday.contains(doseTime) ||
-            todaysStatuses[doseTime] == DoseStatus.taken.rawValue {
-            updatedMedication.takenDoseTimesToday.removeAll { $0 == doseTime }
+        if todaysStatuses[doseTime] == DoseStatus.taken.rawValue {
             todaysStatuses.removeValue(forKey: doseTime)
             todaysUpdatedAt.removeValue(forKey: doseTime)
             addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
@@ -674,10 +663,9 @@ struct DoseRow: View {
         var todaysLog = updatedMedication.doseStatusLogHistory[todayKey] ?? [:]
 
         updatedMedication.takenDoseTimesToday.removeAll { $0 == doseTime }
+        updatedMedication.unsureDoseTimesToday.removeAll { $0 == doseTime }
 
-        if updatedMedication.unsureDoseTimesToday.contains(doseTime) ||
-            todaysStatuses[doseTime] == DoseStatus.unsure.rawValue {
-            updatedMedication.unsureDoseTimesToday.removeAll { $0 == doseTime }
+        if todaysStatuses[doseTime] == DoseStatus.unsure.rawValue {
             todaysStatuses.removeValue(forKey: doseTime)
             todaysUpdatedAt.removeValue(forKey: doseTime)
             addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)

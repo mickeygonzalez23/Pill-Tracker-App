@@ -583,30 +583,23 @@ enum MedicationIntentStore {
         var todaysUpdatedAt = medication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
         var todaysLog = medication.doseStatusLogHistory[todayKey] ?? [:]
 
+        medication.takenDoseTimesToday.removeAll { $0 == doseTime }
+        medication.unsureDoseTimesToday.removeAll { $0 == doseTime }
+
         switch status {
         case .taken:
-            medication.unsureDoseTimesToday.removeAll { $0 == doseTime }
-
-            if !medication.takenDoseTimesToday.contains(doseTime) {
-                medication.takenDoseTimesToday.append(doseTime)
-            }
+            medication.takenDoseTimesToday.append(doseTime)
 
             todaysStatuses[doseTime] = DoseStatus.taken.rawValue
             todaysUpdatedAt[doseTime] = Date()
             addLogEntry(DoseStatus.taken.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
         case .unsure:
-            medication.takenDoseTimesToday.removeAll { $0 == doseTime }
-
-            if !medication.unsureDoseTimesToday.contains(doseTime) {
-                medication.unsureDoseTimesToday.append(doseTime)
-            }
+            medication.unsureDoseTimesToday.append(doseTime)
 
             todaysStatuses[doseTime] = DoseStatus.unsure.rawValue
             todaysUpdatedAt[doseTime] = Date()
             addLogEntry(DoseStatus.unsure.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
         case .due:
-            medication.takenDoseTimesToday.removeAll { $0 == doseTime }
-            medication.unsureDoseTimesToday.removeAll { $0 == doseTime }
             todaysStatuses.removeValue(forKey: doseTime)
             todaysUpdatedAt.removeValue(forKey: doseTime)
             addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
