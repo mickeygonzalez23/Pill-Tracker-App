@@ -1780,7 +1780,10 @@ struct ShortcutsView: View {
                         .font(.headline)
                         .foregroundStyle(.secondary)
 
-                    ShortcutInstructionCard(title: "How to Log a Pill as Taken or Not Sure", icon: "checkmark.bubble") {
+                    ShortcutInstructionCard(title: "How to log a pill as taken, not sure, or skipped", icon: "checkmark.bubble") {
+                        Text("Press and hold the upper right button on phone, then say one of the phrases below.")
+                            .foregroundStyle(.secondary)
+
                         if medications.isEmpty {
                             Text("Add a medication to make shortcut actions available.")
                                 .foregroundStyle(.secondary)
@@ -1793,6 +1796,7 @@ struct ShortcutsView: View {
 
                                     ShortcutPhraseText("I took \(medication.siriNickname) in Pill Tracker")
                                     ShortcutPhraseText("I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
+                                    ShortcutPhraseText("Skip \(medication.siriNickname) in Pill Tracker")
                                 }
                                 .padding(.vertical, 2)
                             }
@@ -1859,7 +1863,7 @@ struct ShortcutPhraseText: View {
     }
 
     var body: some View {
-        Text(text)
+        Text("“\(text)”")
             .foregroundStyle(.secondary)
             .padding(.vertical, 2)
     }
