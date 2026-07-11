@@ -17,6 +17,7 @@ enum DoseStatus: String, Codable {
     case due = "Due"
     case taken = "Taken"
     case unsure = "Not Sure"
+    case skipped = "Skipped"
 
     var color: Color {
         switch self {
@@ -26,6 +27,8 @@ enum DoseStatus: String, Codable {
             return .green
         case .unsure:
             return Color(red: 0.43, green: 0.39, blue: 0.58)
+        case .skipped:
+            return .blue
         }
     }
 }
@@ -49,6 +52,38 @@ enum DoseHistory {
 }
 
 extension Medication {
+    mutating func setDoseStatus(_ status: DoseStatus?, for doseTime: String, on date: Date = Date()) {
+        let dateKey = DoseHistory.dateKey(for: date)
+        var statuses = doseStatusHistory[dateKey] ?? [:]
+        var updatedAt = doseStatusUpdatedAtHistory[dateKey] ?? [:]
+        var log = doseStatusLogHistory[dateKey] ?? [:]
+
+        takenDoseTimesToday.removeAll { $0 == doseTime }
+        unsureDoseTimesToday.removeAll { $0 == doseTime }
+
+        if let status, status != .due {
+            if status == .taken { takenDoseTimesToday.append(doseTime) }
+            if status == .unsure { unsureDoseTimesToday.append(doseTime) }
+            statuses[doseTime] = status.rawValue
+            updatedAt[doseTime] = Date()
+            appendDoseLog(status.rawValue, doseTime: doseTime, to: &log)
+        } else {
+            statuses.removeValue(forKey: doseTime)
+            updatedAt.removeValue(forKey: doseTime)
+            appendDoseLog("Cleared", doseTime: doseTime, to: &log)
+        }
+
+        doseStatusHistory[dateKey] = statuses.isEmpty ? nil : statuses
+        doseStatusUpdatedAtHistory[dateKey] = updatedAt.isEmpty ? nil : updatedAt
+        doseStatusLogHistory[dateKey] = log.isEmpty ? nil : log
+    }
+
+    private func appendDoseLog(_ status: String, doseTime: String, to log: inout [String: [DoseStatusLogEntry]]) {
+        var entries = log[doseTime] ?? []
+        entries.append(DoseStatusLogEntry(status: status, changedAt: Date()))
+        log[doseTime] = Array(entries.suffix(20))
+    }
+
     nonisolated func isScheduled(on date: Date) -> Bool {
         let calendar = Calendar.current
         let selectedDay = calendar.startOfDay(for: date)
@@ -315,8 +350,12 @@ struct TodayView: View {
         todayDoseItems.filter { $0.medication.doseStatus(for: $0.doseTime, on: Date()) == .unsure }.count
     }
 
+    private var skippedCount: Int {
+        todayDoseItems.filter { $0.medication.doseStatus(for: $0.doseTime, on: Date()) == .skipped }.count
+    }
+
     private var dueCount: Int {
-        max(todayDoseItems.count - takenCount - unsureCount, 0)
+        max(todayDoseItems.count - takenCount - unsureCount - skippedCount, 0)
     }
 
     var body: some View {
@@ -338,6 +377,7 @@ struct TodayView: View {
                         TodaySummaryView(
                             takenCount: takenCount,
                             unsureCount: unsureCount,
+                            skippedCount: skippedCount,
                             dueCount: dueCount
                         )
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -390,10 +430,11 @@ struct TodayDoseItem: Identifiable {
 struct TodaySummaryView: View {
     let takenCount: Int
     let unsureCount: Int
+    let skippedCount: Int
     let dueCount: Int
 
     private var totalCount: Int {
-        takenCount + unsureCount + dueCount
+        takenCount + unsureCount + skippedCount + dueCount
     }
 
     var body: some View {
@@ -422,6 +463,7 @@ struct TodaySummaryView: View {
             HStack(spacing: 10) {
                 HistoryCountPill(title: "Taken", count: takenCount, color: DoseStatus.taken.color)
                 HistoryCountPill(title: "Not Sure", count: unsureCount, color: DoseStatus.unsure.color)
+                HistoryCountPill(title: "Skipped", count: skippedCount, color: DoseStatus.skipped.color)
                 HistoryCountPill(title: "Due", count: dueCount, color: DoseStatus.due.color)
             }
         }
@@ -599,6 +641,20 @@ struct DoseRow: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .tint(status == .unsure ? .secondary : DoseStatus.unsure.color)
+
+                Button {
+                    toggleStatus(.skipped)
+                } label: {
+                    Label(
+                        status == .skipped ? "Clear Skipped" : "Skip",
+                        systemImage: status == .skipped ? "xmark.circle" : "forward.circle"
+                    )
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(status == .skipped ? .secondary : DoseStatus.skipped.color)
             }
         }
         .padding()
@@ -616,6 +672,8 @@ struct DoseRow: View {
             return "checkmark.circle.fill"
         case .unsure:
             return "questionmark.circle.fill"
+        case .skipped:
+            return "forward.circle.fill"
         case .due:
             switch doseTimingState {
             case .pastDue:
@@ -629,63 +687,17 @@ struct DoseRow: View {
     }
 
     private func markTaken() {
-        var updatedMedication = medication
-        let todayKey = DoseHistory.dateKey(for: Date())
-        var todaysStatuses = updatedMedication.doseStatusHistory[todayKey] ?? [:]
-        var todaysUpdatedAt = updatedMedication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
-        var todaysLog = updatedMedication.doseStatusLogHistory[todayKey] ?? [:]
-
-        updatedMedication.takenDoseTimesToday.removeAll { $0 == doseTime }
-        updatedMedication.unsureDoseTimesToday.removeAll { $0 == doseTime }
-
-        if todaysStatuses[doseTime] == DoseStatus.taken.rawValue {
-            todaysStatuses.removeValue(forKey: doseTime)
-            todaysUpdatedAt.removeValue(forKey: doseTime)
-            addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
-        } else {
-            updatedMedication.takenDoseTimesToday.append(doseTime)
-            todaysStatuses[doseTime] = DoseStatus.taken.rawValue
-            todaysUpdatedAt[doseTime] = Date()
-            addLogEntry(DoseStatus.taken.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
-        }
-
-        updatedMedication.doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
-        updatedMedication.doseStatusUpdatedAtHistory[todayKey] = todaysUpdatedAt.isEmpty ? nil : todaysUpdatedAt
-        updatedMedication.doseStatusLogHistory[todayKey] = todaysLog.isEmpty ? nil : todaysLog
-        updateMedication(updatedMedication)
+        toggleStatus(.taken)
     }
 
     private func markUnsure() {
-        var updatedMedication = medication
-        let todayKey = DoseHistory.dateKey(for: Date())
-        var todaysStatuses = updatedMedication.doseStatusHistory[todayKey] ?? [:]
-        var todaysUpdatedAt = updatedMedication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
-        var todaysLog = updatedMedication.doseStatusLogHistory[todayKey] ?? [:]
-
-        updatedMedication.takenDoseTimesToday.removeAll { $0 == doseTime }
-        updatedMedication.unsureDoseTimesToday.removeAll { $0 == doseTime }
-
-        if todaysStatuses[doseTime] == DoseStatus.unsure.rawValue {
-            todaysStatuses.removeValue(forKey: doseTime)
-            todaysUpdatedAt.removeValue(forKey: doseTime)
-            addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
-        } else {
-            updatedMedication.unsureDoseTimesToday.append(doseTime)
-            todaysStatuses[doseTime] = DoseStatus.unsure.rawValue
-            todaysUpdatedAt[doseTime] = Date()
-            addLogEntry(DoseStatus.unsure.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
-        }
-
-        updatedMedication.doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
-        updatedMedication.doseStatusUpdatedAtHistory[todayKey] = todaysUpdatedAt.isEmpty ? nil : todaysUpdatedAt
-        updatedMedication.doseStatusLogHistory[todayKey] = todaysLog.isEmpty ? nil : todaysLog
-        updateMedication(updatedMedication)
+        toggleStatus(.unsure)
     }
 
-    private func addLogEntry(_ status: String, doseTime: String, todaysLog: inout [String: [DoseStatusLogEntry]]) {
-        var entries = todaysLog[doseTime] ?? []
-        entries.append(DoseStatusLogEntry(status: status, changedAt: Date()))
-        todaysLog[doseTime] = Array(entries.suffix(20))
+    private func toggleStatus(_ newStatus: DoseStatus) {
+        var updatedMedication = medication
+        updatedMedication.setDoseStatus(status == newStatus ? nil : newStatus, for: doseTime)
+        updateMedication(updatedMedication)
     }
 }
 
@@ -1436,6 +1448,14 @@ struct HistoryView: View {
         }
     }
 
+    private var skippedCount: Int {
+        selectedMedications.reduce(0) { total, medication in
+            total + medication.displayDoseTimes.filter {
+                medication.doseStatus(for: $0, on: selectedDate) == .skipped
+            }.count
+        }
+    }
+
     private var totalDoseCount: Int {
         selectedMedications.reduce(0) { total, medication in
             total + medication.displayDoseTimes.count
@@ -1522,9 +1542,10 @@ struct HistoryView: View {
             HStack(spacing: 10) {
                 HistoryCountPill(title: "Taken", count: takenCount, color: DoseStatus.taken.color)
                 HistoryCountPill(title: "Not Sure", count: unsureCount, color: DoseStatus.unsure.color)
+                HistoryCountPill(title: "Skipped", count: skippedCount, color: DoseStatus.skipped.color)
                 HistoryCountPill(
                     title: "Due",
-                    count: max(totalDoseCount - takenCount - unsureCount, 0),
+                    count: max(totalDoseCount - takenCount - unsureCount - skippedCount, 0),
                     color: DoseStatus.due.color
                 )
             }
@@ -1617,6 +1638,10 @@ struct HistoryCalendarView: View {
 
         if statuses.contains(.unsure) {
             return .unsure
+        }
+
+        if statuses.contains(.skipped) {
+            return .skipped
         }
 
         if statuses.contains(.due) {

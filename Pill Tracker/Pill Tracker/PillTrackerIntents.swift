@@ -221,6 +221,36 @@ struct MarkMedicationUnsureIntent: AppIntent {
         return MedicationIntentStore.markMedicationDoseWithMessage(id: medication.id, doseTime: doseTime, as: status)
     }
 }
+
+struct MarkMedicationSkippedIntent: AppIntent {
+    static var title: LocalizedStringResource = "Mark Medication Skipped"
+    static var description = IntentDescription("Marks the next relevant dose for a medication as skipped using its private medication nickname.")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "Medication") var medication: MedicationEntity
+    @Parameter(title: "Dose") var doseNumber: DoseNumber?
+
+    init() {
+        medication = MedicationEntity(id: "", name: "", realName: "")
+        doseNumber = nil
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let selection = MedicationIntentStore.doseSelection(for: medication.id, selectedDoseNumber: doseNumber)
+        if let message = selection.message { return .result(dialog: IntentDialog(stringLiteral: message)) }
+        if selection.needsChoice {
+            let selected = try await $doseNumber.requestDisambiguation(
+                among: selection.candidateDoseNumbers,
+                dialog: IntentDialog(stringLiteral: selection.choicePrompt ?? "Which dose?")
+            )
+            return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseNumberWithMessage(id: medication.id, doseNumber: selected, as: .skipped)))
+        }
+        guard let doseTime = selection.doseTime else {
+            return .result(dialog: "I could not find a dose to log.")
+        }
+        return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseWithMessage(id: medication.id, doseTime: doseTime, as: .skipped)))
+    }
+}
 struct CheckDueMedicationsIntent: AppIntent {
     static var title: LocalizedStringResource = "Pill Tracker Status"
     static var description = IntentDescription("Gives a status report for medications still due today.")
@@ -252,6 +282,16 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Not Sure",
             systemImageName: "questionmark.circle"
+        )
+
+        AppShortcut(
+            intent: MarkMedicationSkippedIntent(),
+            phrases: [
+                "Mark \(\.$medication) as skipped in \(.applicationName)",
+                "Skip \(\.$medication) in \(.applicationName)"
+            ],
+            shortTitle: "Skipped",
+            systemImageName: "forward.circle"
         )
 
         AppShortcut(
@@ -314,11 +354,7 @@ enum MedicationIntentStore {
         }
         saveMedications(medications)
 
-        if status == .taken {
-            return "Marked \(medications[index].siriNickname) as taken for today."
-        }
-
-        return "Marked \(medications[index].siriNickname) as not sure for today."
+        return "Marked \(medications[index].siriNickname) as \(spokenStatus(status)) for today."
     }
 
     nonisolated static func markNextMedicationDose(id medicationID: String, as status: DoseStatus) -> String {
@@ -408,11 +444,7 @@ enum MedicationIntentStore {
         apply(status, to: &medications[index], doseTime: doseTime)
         saveMedications(medications)
 
-        if status == .taken {
-            return "Marked \(medications[index].siriNickname) at \(doseTime) as taken."
-        }
-
-        return "Marked \(medications[index].siriNickname) at \(doseTime) as not sure."
+        return "Marked \(medications[index].siriNickname) at \(doseTime) as \(spokenStatus(status))."
     }
 
     nonisolated static func dueMedicationsSummary() -> String {
@@ -557,6 +589,15 @@ enum MedicationIntentStore {
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
     }
 
+    nonisolated private static func spokenStatus(_ status: DoseStatus) -> String {
+        switch status {
+        case .taken: return "taken"
+        case .unsure: return "not sure"
+        case .skipped: return "skipped"
+        case .due: return "due"
+        }
+    }
+
     nonisolated private static func loadMedications() -> [Medication] {
         guard
             let data = UserDefaults.standard.data(forKey: storageKey),
@@ -578,41 +619,6 @@ enum MedicationIntentStore {
     }
 
     nonisolated private static func apply(_ status: DoseStatus, to medication: inout Medication, doseTime: String) {
-        let todayKey = DoseHistory.dateKey(for: Date())
-        var todaysStatuses = medication.doseStatusHistory[todayKey] ?? [:]
-        var todaysUpdatedAt = medication.doseStatusUpdatedAtHistory[todayKey] ?? [:]
-        var todaysLog = medication.doseStatusLogHistory[todayKey] ?? [:]
-
-        medication.takenDoseTimesToday.removeAll { $0 == doseTime }
-        medication.unsureDoseTimesToday.removeAll { $0 == doseTime }
-
-        switch status {
-        case .taken:
-            medication.takenDoseTimesToday.append(doseTime)
-
-            todaysStatuses[doseTime] = DoseStatus.taken.rawValue
-            todaysUpdatedAt[doseTime] = Date()
-            addLogEntry(DoseStatus.taken.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
-        case .unsure:
-            medication.unsureDoseTimesToday.append(doseTime)
-
-            todaysStatuses[doseTime] = DoseStatus.unsure.rawValue
-            todaysUpdatedAt[doseTime] = Date()
-            addLogEntry(DoseStatus.unsure.rawValue, doseTime: doseTime, todaysLog: &todaysLog)
-        case .due:
-            todaysStatuses.removeValue(forKey: doseTime)
-            todaysUpdatedAt.removeValue(forKey: doseTime)
-            addLogEntry("Cleared", doseTime: doseTime, todaysLog: &todaysLog)
-        }
-
-        medication.doseStatusHistory[todayKey] = todaysStatuses.isEmpty ? nil : todaysStatuses
-        medication.doseStatusUpdatedAtHistory[todayKey] = todaysUpdatedAt.isEmpty ? nil : todaysUpdatedAt
-        medication.doseStatusLogHistory[todayKey] = todaysLog.isEmpty ? nil : todaysLog
-    }
-
-    nonisolated private static func addLogEntry(_ status: String, doseTime: String, todaysLog: inout [String: [DoseStatusLogEntry]]) {
-        var entries = todaysLog[doseTime] ?? []
-        entries.append(DoseStatusLogEntry(status: status, changedAt: Date()))
-        todaysLog[doseTime] = Array(entries.suffix(20))
+        medication.setDoseStatus(status == .due ? nil : status, for: doseTime)
     }
 }

@@ -12,6 +12,7 @@ enum NotificationScheduler {
     static let reminderCategoryIdentifier = "MEDICATION_REMINDER"
     static let takenActionIdentifier = "MARK_TAKEN"
     static let unsureActionIdentifier = "MARK_UNSURE"
+    static let skippedActionIdentifier = "MARK_SKIPPED"
     static let snoozeActionIdentifier = "REMIND_LATER"
 
     private static let reminderPrefix = "medication-reminder-"
@@ -28,6 +29,11 @@ enum NotificationScheduler {
             title: "Not Sure",
             options: []
         )
+        let skippedAction = UNNotificationAction(
+            identifier: skippedActionIdentifier,
+            title: "Skipped",
+            options: []
+        )
         let snoozeAction = UNNotificationAction(
             identifier: snoozeActionIdentifier,
             title: "Remind Me Later",
@@ -36,7 +42,7 @@ enum NotificationScheduler {
 
         let category = UNNotificationCategory(
             identifier: reminderCategoryIdentifier,
-            actions: [takenAction, unsureAction, snoozeAction],
+            actions: [takenAction, unsureAction, skippedAction, snoozeAction],
             intentIdentifiers: [],
             options: []
         )

@@ -44,6 +44,8 @@ final class NotificationResponseHandler: NSObject, UIApplicationDelegate, UNUser
             MedicationIntentStore.markMedicationDose(id: medicationID, doseTime: doseTime, as: .taken)
         case NotificationScheduler.unsureActionIdentifier:
             MedicationIntentStore.markMedicationDose(id: medicationID, doseTime: doseTime, as: .unsure)
+        case NotificationScheduler.skippedActionIdentifier:
+            MedicationIntentStore.markMedicationDose(id: medicationID, doseTime: doseTime, as: .skipped)
         case NotificationScheduler.snoozeActionIdentifier:
             guard let medication = MedicationIntentStore.medication(id: medicationID) else {
                 return
