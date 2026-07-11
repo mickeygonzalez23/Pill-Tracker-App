@@ -52,6 +52,33 @@ enum DoseHistory {
 }
 
 extension Medication {
+    nonisolated func intervalOccurrences() -> [Date] {
+        guard scheduleKind == .everyXHours,
+              let start = intervalStartDate,
+              let finish = intervalFinishDate,
+              finish >= start else { return [] }
+        let step = TimeInterval(max(intervalHours, 1) * 3_600)
+        var result: [Date] = []
+        var occurrence = start
+        while occurrence <= finish {
+            result.append(occurrence)
+            occurrence = occurrence.addingTimeInterval(step)
+        }
+        return result
+    }
+
+    nonisolated func doseTimes(on date: Date) -> [String] {
+        guard scheduleKind == .everyXHours else {
+            return isScheduledByDayRules(on: date) ? displayDoseTimes : []
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        return intervalOccurrences()
+            .filter { Calendar.current.isDate($0, inSameDayAs: date) }
+            .map { formatter.string(from: $0) }
+    }
+
     mutating func setDoseStatus(_ status: DoseStatus?, for doseTime: String, on date: Date = Date()) {
         let dateKey = DoseHistory.dateKey(for: date)
         var statuses = doseStatusHistory[dateKey] ?? [:]
@@ -85,6 +112,13 @@ extension Medication {
     }
 
     nonisolated func isScheduled(on date: Date) -> Bool {
+        if scheduleKind == .everyXHours {
+            return !doseTimes(on: date).isEmpty
+        }
+        return isScheduledByDayRules(on: date)
+    }
+
+    private nonisolated func isScheduledByDayRules(on date: Date) -> Bool {
         let calendar = Calendar.current
         let selectedDay = calendar.startOfDay(for: date)
         let createdDay = calendar.startOfDay(for: createdAt)
@@ -335,7 +369,7 @@ struct TodayView: View {
         medications
             .filter { $0.isScheduled(on: Date()) }
             .flatMap { medication in
-                medication.displayDoseTimes.map {
+                medication.doseTimes(on: Date()).map {
                     TodayDoseItem(medication: medication, doseTime: $0)
                 }
             }
@@ -897,6 +931,8 @@ struct MedicationFormView: View {
     @State private var intervalHours = 4
     @State private var intervalStartTime = "8:00 AM"
     @State private var intervalEndTime = "8:00 PM"
+    @State private var intervalStartDate = Date()
+    @State private var intervalFinishDate = Date().addingTimeInterval(12 * 3_600)
     @State private var dayScheduleKind = DayScheduleKind.everyDay
     @State private var selectedWeekdays = Set(Weekday.allCases.map(\.id))
     @State private var remindersEnabled = true
@@ -928,6 +964,8 @@ struct MedicationFormView: View {
         _intervalHours = State(initialValue: medication?.intervalHours ?? 4)
         _intervalStartTime = State(initialValue: medication?.intervalStartTime ?? "8:00 AM")
         _intervalEndTime = State(initialValue: medication?.intervalEndTime ?? "8:00 PM")
+        _intervalStartDate = State(initialValue: medication?.intervalStartDate ?? Date())
+        _intervalFinishDate = State(initialValue: medication?.intervalFinishDate ?? Date().addingTimeInterval(12 * 3_600))
         _dayScheduleKind = State(initialValue: medication?.dayScheduleKind ?? .everyDay)
         _selectedWeekdays = State(initialValue: Set(medication?.selectedWeekdays ?? Weekday.allCases.map(\.id)))
         _remindersEnabled = State(initialValue: medication?.remindersEnabled ?? true)
@@ -957,7 +995,8 @@ struct MedicationFormView: View {
         !trimmedNickname.isEmpty &&
         !nicknameAlreadyExists &&
         !calculatedDoseTimes.isEmpty &&
-        (dayScheduleKind == .everyDay || !selectedWeekdays.isEmpty)
+        (scheduleKind != .everyXHours || intervalFinishDate >= intervalStartDate) &&
+        (scheduleKind == .everyXHours || dayScheduleKind == .everyDay || !selectedWeekdays.isEmpty)
     }
 
     private var calculatedDoseTimes: [String] {
@@ -991,7 +1030,7 @@ struct MedicationFormView: View {
         }
 
         if calculatedDoseTimes.isEmpty {
-            return "Choose at least one dose time."
+            return scheduleKind == .everyXHours ? "Choose a finish after the start." : "Choose at least one dose time."
         }
 
         if dayScheduleKind == .specificDays && selectedWeekdays.isEmpty {
@@ -1036,7 +1075,7 @@ struct MedicationFormView: View {
                         if scheduleKind == .specificTimes {
                             DoseTimesPreview(times: calculatedDoseTimes, deleteTime: deleteSpecificTime)
                         } else {
-                            DoseTimesPreview(times: calculatedDoseTimes)
+                            DoseTimesPreview(times: previewDoseTimes)
                         }
 
                         switch scheduleKind {
@@ -1061,8 +1100,8 @@ struct MedicationFormView: View {
                                 }
                             }
 
-                            timePicker("Start", selection: $intervalStartTime)
-                            timePicker("End", selection: $intervalEndTime)
+                            DatePicker("Start", selection: $intervalStartDate, displayedComponents: [.date, .hourAndMinute])
+                            DatePicker("Finish", selection: $intervalFinishDate, displayedComponents: [.date, .hourAndMinute])
 
                             Text(intervalSummary)
                                 .font(.caption)
@@ -1070,6 +1109,7 @@ struct MedicationFormView: View {
                         }
                     }
 
+                    if scheduleKind != .everyXHours {
                     formSection("Days") {
                         Toggle("Only certain days", isOn: specificDaysBinding)
 
@@ -1086,6 +1126,7 @@ struct MedicationFormView: View {
                                     .foregroundStyle(.red)
                             }
                         }
+                    }
                     }
 
                     formSection("Reminders") {
@@ -1237,6 +1278,8 @@ struct MedicationFormView: View {
         savedMedication.intervalHours = intervalHours
         savedMedication.intervalStartTime = intervalStartTime
         savedMedication.intervalEndTime = intervalEndTime
+        savedMedication.intervalStartDate = scheduleKind == .everyXHours ? intervalStartDate : nil
+        savedMedication.intervalFinishDate = scheduleKind == .everyXHours ? intervalFinishDate : nil
         savedMedication.dayScheduleKind = dayScheduleKind
         savedMedication.selectedWeekdays = selectedWeekdays.sorted()
         savedMedication.remindersEnabled = remindersEnabled
@@ -1294,16 +1337,38 @@ struct MedicationFormView: View {
     }
 
     private func generatedIntervalDoseTimes() -> [String] {
-        let startIndex = timeIndex(intervalStartTime)
-        let endIndex = timeIndex(intervalEndTime)
-
-        guard startIndex <= endIndex else {
-            return []
-        }
-
-        let step = max(intervalHours, 1) * 12
-        return stride(from: startIndex, through: endIndex, by: step).map { timeOptions[$0] }
+        intervalOccurrenceDates.map { Self.timeFormatter.string(from: $0) }
     }
+
+    private var intervalOccurrenceDates: [Date] {
+        guard intervalFinishDate >= intervalStartDate else { return [] }
+        let step = TimeInterval(max(intervalHours, 1) * 3_600)
+        var dates: [Date] = []
+        var date = intervalStartDate
+        while date <= intervalFinishDate {
+            dates.append(date)
+            date = date.addingTimeInterval(step)
+        }
+        return dates
+    }
+
+    private var previewDoseTimes: [String] {
+        guard scheduleKind == .everyXHours else { return calculatedDoseTimes }
+        return intervalOccurrenceDates.map { Self.previewFormatter.string(from: $0) }
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        return formatter
+    }()
+
+    private static let previewFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d, h:mm a"
+        return formatter
+    }()
 
     private var intervalSummary: String {
         let times = calculatedDoseTimes
@@ -1355,7 +1420,7 @@ struct DoseTimesPreview: View {
 
             if !times.isEmpty {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-                    ForEach(times, id: \.self) { time in
+                    ForEach(Array(times.enumerated()), id: \.offset) { _, time in
                         if let deleteTime {
                             Button {
                                 deleteTime(time)
@@ -1434,7 +1499,7 @@ struct HistoryView: View {
 
     private var takenCount: Int {
         selectedMedications.reduce(0) { total, medication in
-            total + medication.displayDoseTimes.filter {
+            total + medication.doseTimes(on: selectedDate).filter {
                 medication.doseStatus(for: $0, on: selectedDate) == .taken
             }.count
         }
@@ -1442,7 +1507,7 @@ struct HistoryView: View {
 
     private var unsureCount: Int {
         selectedMedications.reduce(0) { total, medication in
-            total + medication.displayDoseTimes.filter {
+            total + medication.doseTimes(on: selectedDate).filter {
                 medication.doseStatus(for: $0, on: selectedDate) == .unsure
             }.count
         }
@@ -1450,7 +1515,7 @@ struct HistoryView: View {
 
     private var skippedCount: Int {
         selectedMedications.reduce(0) { total, medication in
-            total + medication.displayDoseTimes.filter {
+            total + medication.doseTimes(on: selectedDate).filter {
                 medication.doseStatus(for: $0, on: selectedDate) == .skipped
             }.count
         }
@@ -1458,7 +1523,7 @@ struct HistoryView: View {
 
     private var totalDoseCount: Int {
         selectedMedications.reduce(0) { total, medication in
-            total + medication.displayDoseTimes.count
+            total + medication.doseTimes(on: selectedDate).count
         }
     }
 
@@ -1490,7 +1555,7 @@ struct HistoryView: View {
                                 .foregroundStyle(.secondary)
 
                             ForEach(selectedMedications) { medication in
-                                ForEach(medication.displayDoseTimes, id: \.self) { doseTime in
+                                ForEach(medication.doseTimes(on: selectedDate), id: \.self) { doseTime in
                                     HistoryDoseRow(
                                         medication: medication,
                                         doseTime: doseTime,
@@ -1631,7 +1696,7 @@ struct HistoryCalendarView: View {
         }
 
         let statuses = scheduledMedications.flatMap { medication in
-            medication.displayDoseTimes.map {
+            medication.doseTimes(on: date).map {
                 medication.doseStatus(for: $0, on: date)
             }
         }

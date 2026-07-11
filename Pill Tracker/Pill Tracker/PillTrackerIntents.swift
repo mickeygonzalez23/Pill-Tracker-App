@@ -348,7 +348,7 @@ enum MedicationIntentStore {
             return "\(medications[index].siriNickname) is not scheduled for today."
         }
 
-        let doseTimes = medications[index].displayDoseTimes
+        let doseTimes = medications[index].doseTimes(on: Date())
         for doseTime in doseTimes {
             apply(status, to: &medications[index], doseTime: doseTime)
         }
@@ -382,8 +382,8 @@ enum MedicationIntentStore {
             return DoseSelection(doseTime: nil, candidateDoseNumbers: [], needsChoice: false, choicePrompt: nil, message: "\(medications[index].siriNickname) is not scheduled for today.")
         }
 
-        let doseTimes = medications[index].displayDoseTimes
-        let unloggedDoseTimes = medications[index].displayDoseTimes.filter {
+        let doseTimes = medications[index].doseTimes(on: Date())
+        let unloggedDoseTimes = doseTimes.filter {
             medications[index].doseStatus(for: $0, on: Date()) == .due
         }
 
@@ -451,7 +451,7 @@ enum MedicationIntentStore {
         let dueDoseNames = loadMedications()
             .filter { $0.isScheduled(on: Date()) }
             .flatMap { medication in
-                medication.displayDoseTimes.compactMap { doseTime -> String? in
+                medication.doseTimes(on: Date()).compactMap { doseTime -> String? in
                     guard medication.doseStatus(for: doseTime, on: Date()) == .due else {
                         return nil
                     }

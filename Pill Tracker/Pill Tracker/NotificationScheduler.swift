@@ -97,6 +97,13 @@ enum NotificationScheduler {
     }
 
     private static func scheduleMedication(_ medication: Medication) {
+        if medication.scheduleKind == .everyXHours {
+            medication.intervalOccurrences()
+                .filter { $0 > Date() }
+                .forEach { scheduleIntervalOccurrence($0, medication: medication) }
+            return
+        }
+
         let weekdays = medication.dayScheduleKind == .everyDay
             ? Weekday.allCases.map(\.id)
             : medication.selectedWeekdays
@@ -131,6 +138,24 @@ enum NotificationScheduler {
                 UNUserNotificationCenter.current().add(request)
             }
         }
+    }
+
+    private static func scheduleIntervalOccurrence(_ date: Date, medication: Medication) {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        let doseTime = formatter.string(from: date)
+        let content = UNMutableNotificationContent()
+        content.title = "Pill Reminder"
+        content.body = "Time for \(medication.siriNickname) (\(medication.dose))."
+        content.sound = .default
+        content.categoryIdentifier = reminderCategoryIdentifier
+        content.userInfo = ["medicationID": medication.id.uuidString, "doseTime": doseTime]
+
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let identifier = "\(reminderPrefix)\(medication.id.uuidString)-\(Int(date.timeIntervalSince1970))"
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
     }
 
     private static func parseDoseTime(_ doseTime: String) -> (hour: Int, minute: Int)? {

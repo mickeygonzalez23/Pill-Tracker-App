@@ -26,6 +26,8 @@ struct Medication: Identifiable, Codable, Equatable {
     var intervalHours: Int = 4
     var intervalStartTime: String = "8:00 AM"
     var intervalEndTime: String = "8:00 PM"
+    var intervalStartDate: Date?
+    var intervalFinishDate: Date?
     var dayScheduleKind: DayScheduleKind = .everyDay
     var selectedWeekdays: [Int] = Weekday.allCases.map(\.id)
     var takenDoseTimesToday: [String] = []
@@ -51,9 +53,19 @@ struct Medication: Identifiable, Codable, Equatable {
         case .twiceDaily, .specificTimes:
             return displayDoseTimes.joined(separator: ", ")
         case .everyXHours:
-            return "Every \(intervalHours) hours, \(intervalStartTime)-\(intervalEndTime)"
+            guard let start = intervalStartDate, let finish = intervalFinishDate else {
+                return "Every \(intervalHours) hours, \(intervalStartTime)-\(intervalEndTime)"
+            }
+            return "Every \(intervalHours) hours, \(Self.rangeFormatter.string(from: start))-\(Self.rangeFormatter.string(from: finish))"
         }
     }
+
+    nonisolated static let rangeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     var isTakenToday: Bool {
         get {
@@ -91,6 +103,8 @@ struct Medication: Identifiable, Codable, Equatable {
         intervalHours: Int = 4,
         intervalStartTime: String = "8:00 AM",
         intervalEndTime: String = "8:00 PM",
+        intervalStartDate: Date? = nil,
+        intervalFinishDate: Date? = nil,
         dayScheduleKind: DayScheduleKind = .everyDay,
         selectedWeekdays: [Int] = Weekday.allCases.map(\.id),
         takenDoseTimesToday: [String] = [],
@@ -111,6 +125,8 @@ struct Medication: Identifiable, Codable, Equatable {
         self.intervalHours = intervalHours
         self.intervalStartTime = intervalStartTime
         self.intervalEndTime = intervalEndTime
+        self.intervalStartDate = intervalStartDate
+        self.intervalFinishDate = intervalFinishDate
         self.dayScheduleKind = dayScheduleKind
         self.selectedWeekdays = selectedWeekdays
         self.takenDoseTimesToday = takenDoseTimesToday
@@ -133,6 +149,8 @@ struct Medication: Identifiable, Codable, Equatable {
         case intervalHours
         case intervalStartTime
         case intervalEndTime
+        case intervalStartDate
+        case intervalFinishDate
         case dayScheduleKind
         case selectedWeekdays
         case takenDoseTimesToday
@@ -154,9 +172,19 @@ struct Medication: Identifiable, Codable, Equatable {
         doseTime = try container.decode(String.self, forKey: .doseTime)
         scheduleKind = try container.decodeIfPresent(ScheduleKind.self, forKey: .scheduleKind) ?? .onceDaily
         doseTimes = try container.decodeIfPresent([String].self, forKey: .doseTimes) ?? [doseTime]
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         intervalHours = try container.decodeIfPresent(Int.self, forKey: .intervalHours) ?? 4
         intervalStartTime = try container.decodeIfPresent(String.self, forKey: .intervalStartTime) ?? "8:00 AM"
         intervalEndTime = try container.decodeIfPresent(String.self, forKey: .intervalEndTime) ?? "8:00 PM"
+        intervalStartDate = try container.decodeIfPresent(Date.self, forKey: .intervalStartDate)
+        intervalFinishDate = try container.decodeIfPresent(Date.self, forKey: .intervalFinishDate)
+        if scheduleKind == .everyXHours && (intervalStartDate == nil || intervalFinishDate == nil) {
+            intervalStartDate = Self.legacyDate(time: intervalStartTime, anchoredTo: createdAt)
+            intervalFinishDate = Self.legacyDate(time: intervalEndTime, anchoredTo: createdAt)
+            if let start = intervalStartDate, let finish = intervalFinishDate, finish < start {
+                intervalFinishDate = Calendar.current.date(byAdding: .day, value: 1, to: finish)
+            }
+        }
         dayScheduleKind = try container.decodeIfPresent(DayScheduleKind.self, forKey: .dayScheduleKind) ?? .everyDay
         selectedWeekdays = try container.decodeIfPresent([Int].self, forKey: .selectedWeekdays) ?? Weekday.allCases.map(\.id)
         takenDoseTimesToday = try container.decodeIfPresent([String].self, forKey: .takenDoseTimesToday) ?? []
@@ -165,7 +193,6 @@ struct Medication: Identifiable, Codable, Equatable {
         doseStatusUpdatedAtHistory = try container.decodeIfPresent([String: [String: Date]].self, forKey: .doseStatusUpdatedAtHistory) ?? [:]
         doseStatusLogHistory = try container.decodeIfPresent([String: [String: [DoseStatusLogEntry]]].self, forKey: .doseStatusLogHistory) ?? [:]
         remindersEnabled = try container.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
-        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
 
         if try container.decodeIfPresent(Bool.self, forKey: .isTakenToday) == true {
             takenDoseTimesToday = doseTimes
@@ -184,6 +211,8 @@ struct Medication: Identifiable, Codable, Equatable {
         try container.encode(intervalHours, forKey: .intervalHours)
         try container.encode(intervalStartTime, forKey: .intervalStartTime)
         try container.encode(intervalEndTime, forKey: .intervalEndTime)
+        try container.encodeIfPresent(intervalStartDate, forKey: .intervalStartDate)
+        try container.encodeIfPresent(intervalFinishDate, forKey: .intervalFinishDate)
         try container.encode(dayScheduleKind, forKey: .dayScheduleKind)
         try container.encode(selectedWeekdays, forKey: .selectedWeekdays)
         try container.encode(takenDoseTimesToday, forKey: .takenDoseTimesToday)
@@ -193,6 +222,16 @@ struct Medication: Identifiable, Codable, Equatable {
         try container.encode(doseStatusLogHistory, forKey: .doseStatusLogHistory)
         try container.encode(remindersEnabled, forKey: .remindersEnabled)
         try container.encode(createdAt, forKey: .createdAt)
+    }
+
+    private nonisolated static func legacyDate(time: String, anchoredTo date: Date) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "h:mm a"
+        guard let parsed = formatter.date(from: time) else { return nil }
+        let calendar = Calendar.current
+        let timeParts = calendar.dateComponents([.hour, .minute], from: parsed)
+        return calendar.date(bySettingHour: timeParts.hour ?? 0, minute: timeParts.minute ?? 0, second: 0, of: date)
     }
 }
 
