@@ -299,12 +299,21 @@ final class MedicationStore: ObservableObject {
             NotificationScheduler.scheduleReminders(for: medications)
         }
     }
+    @Published private(set) var dailyNotes: [String: String] = [:] {
+        didSet { saveNotes() }
+    }
 
     private let storageKey = "savedMedications"
+    private let notesStorageKey = "dailyNotes"
+    private let defaults: UserDefaults
 
-    init() {
+    init(defaults: UserDefaults = .standard, scheduleNotifications: Bool = true) {
+        self.defaults = defaults
         load()
-        NotificationScheduler.requestPermissionAndSchedule(for: medications)
+        loadNotes()
+        if scheduleNotifications {
+            NotificationScheduler.requestPermissionAndSchedule(for: medications)
+        }
     }
 
     func add(_ medication: Medication) {
@@ -325,17 +334,30 @@ final class MedicationStore: ObservableObject {
 
     func reload() {
         load()
+        loadNotes()
     }
 
     func resetAllData() {
         medications = []
-        UserDefaults.standard.removeObject(forKey: storageKey)
+        dailyNotes = [:]
+        defaults.removeObject(forKey: storageKey)
+        defaults.removeObject(forKey: notesStorageKey)
         NotificationScheduler.cancelMedicationReminders()
+    }
+
+    func note(for date: Date) -> String {
+        dailyNotes[Self.dateKey(for: date)] ?? ""
+    }
+
+    func updateNote(_ note: String, for date: Date) {
+        let key = Self.dateKey(for: date)
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        dailyNotes[key] = trimmed.isEmpty ? nil : trimmed
     }
 
     private func load() {
         guard
-            let data = UserDefaults.standard.data(forKey: storageKey),
+            let data = defaults.data(forKey: storageKey),
             let savedMedications = try? JSONDecoder().decode([Medication].self, from: data)
         else {
             return
@@ -349,7 +371,20 @@ final class MedicationStore: ObservableObject {
             return
         }
 
-        UserDefaults.standard.set(data, forKey: storageKey)
+        defaults.set(data, forKey: storageKey)
         PillTrackerShortcuts.updateAppShortcutParameters()
+    }
+
+    private func loadNotes() {
+        dailyNotes = defaults.dictionary(forKey: notesStorageKey) as? [String: String] ?? [:]
+    }
+
+    private func saveNotes() {
+        defaults.set(dailyNotes, forKey: notesStorageKey)
+    }
+
+    private static func dateKey(for date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 }

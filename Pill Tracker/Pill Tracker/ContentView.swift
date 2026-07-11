@@ -167,8 +167,10 @@ struct ContentView: View {
         TabView {
             TodayView(
                 medications: store.medications,
+                note: store.note(for: Date()),
                 isShowingAddMedication: $isShowingAddMedication,
-                updateMedication: store.update
+                updateMedication: store.update,
+                updateNote: { store.updateNote($0, for: Date()) }
             )
             .tabItem {
                 Label("Today", systemImage: "checklist")
@@ -184,7 +186,7 @@ struct ContentView: View {
                 Label("Meds", systemImage: "pills")
             }
 
-            HistoryView(medications: store.medications)
+            HistoryView(medications: store.medications, dailyNotes: store.dailyNotes)
                 .tabItem {
                     Label("History", systemImage: "calendar")
                 }
@@ -362,8 +364,10 @@ struct OnboardingFeatureRow: View {
 
 struct TodayView: View {
     let medications: [Medication]
+    let note: String
     @Binding var isShowingAddMedication: Bool
     let updateMedication: (Medication) -> Void
+    let updateNote: (String) -> Void
 
     private var todayDoseItems: [TodayDoseItem] {
         medications
@@ -431,6 +435,10 @@ struct TodayView: View {
                         .listRowBackground(Color.clear)
                     }
                 }
+
+                Section("Notes") {
+                    DailyNoteEditor(note: note, onSave: updateNote)
+                }
             }
             .navigationTitle("Today")
             .scrollContentBackground(.hidden)
@@ -449,6 +457,46 @@ struct TodayView: View {
 
     private func timeIndex(_ time: String) -> Int {
         TimeOptionBuilder.fiveMinuteOptions.firstIndex(of: time) ?? 0
+    }
+}
+
+struct DailyNoteEditor: View {
+    let note: String
+    let onSave: (String) -> Void
+    @State private var draft = ""
+    @State private var isEditing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if isEditing {
+                TextEditor(text: $draft)
+                    .frame(minHeight: 100)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.25)))
+                HStack {
+                    Button("Cancel") {
+                        draft = note
+                        isEditing = false
+                    }
+                    Spacer()
+                    Button("Save") {
+                        onSave(draft)
+                        isEditing = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            } else {
+                Text(note.isEmpty ? "No note for today." : note)
+                    .foregroundStyle(note.isEmpty ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(note.isEmpty ? "Add Note" : "Edit Note") {
+                    draft = note
+                    isEditing = true
+                }
+            }
+        }
+        .onChange(of: note) { _, newValue in
+            if !isEditing { draft = newValue }
+        }
     }
 }
 
@@ -1490,6 +1538,7 @@ struct WeekdayPicker: View {
 
 struct HistoryView: View {
     let medications: [Medication]
+    let dailyNotes: [String: String]
     @State private var displayedMonth = Date()
     @State private var selectedDate = Date()
 
@@ -1527,6 +1576,10 @@ struct HistoryView: View {
         }
     }
 
+    private var selectedNote: String? {
+        dailyNotes[DoseHistory.dateKey(for: selectedDate)]
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -1540,6 +1593,17 @@ struct HistoryView: View {
                     )
 
                     selectedDaySummary
+
+                    if let selectedNote, !selectedNote.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Notes").font(.headline)
+                            Text(selectedNote)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.background)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
 
                     if selectedMedications.isEmpty {
                         ContentUnavailableView(
