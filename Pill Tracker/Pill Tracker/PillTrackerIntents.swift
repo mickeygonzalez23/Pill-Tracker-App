@@ -260,19 +260,12 @@ struct MarkMedicationSkippedIntent: AppIntent {
     }
 }
 struct CheckDueMedicationsIntent: AppIntent {
-    static var title: LocalizedStringResource = "Did I Take My Pills?"
+    static var title: LocalizedStringResource = "Pill Tracker Status"
     static var description = IntentDescription("Gives today's status for each scheduled medication dose without changing it.")
     static var openAppWhenRun = false
 
-    @Parameter(title: "Medication")
-    var medication: MedicationEntity?
-
-    init() {
-        medication = nil
-    }
-
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let message = MedicationIntentStore.medicationsStatusSummary(medicationID: medication?.id)
+        let message = MedicationIntentStore.medicationsStatusSummary()
         return .result(dialog: IntentDialog(stringLiteral: message))
     }
 }
@@ -282,12 +275,12 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: CheckDueMedicationsIntent(),
             phrases: [
-                "Did I take my pills in \(.applicationName)?",
-                "Did I take \(\.$medication) in \(.applicationName)?",
                 "Check my medication status in \(.applicationName)",
-                "\(.applicationName) status report"
+                "\(.applicationName) status report",
+                "\(.applicationName) medication status",
+                "\(.applicationName) pill status"
             ],
-            shortTitle: "Did I Take My Pills?",
+            shortTitle: "Medication Status",
             systemImageName: "list.bullet.clipboard"
         )
 
@@ -454,11 +447,8 @@ enum MedicationIntentStore {
         return "Marked \(medications[index].siriNickname) at \(doseTime) as \(spokenStatus(status))."
     }
 
-    nonisolated static func medicationsStatusSummary(medicationID: String? = nil) -> String {
-        let medications = loadMedications().filter { medication in
-            medicationID == nil || medication.id.uuidString == medicationID
-        }
-        let statuses = medications
+    nonisolated static func medicationsStatusSummary() -> String {
+        let statuses = loadMedications()
             .filter { $0.isScheduled(on: Date()) }
             .flatMap { medication in
                 medication.doseTimes(on: Date()).map { doseTime in
@@ -468,7 +458,7 @@ enum MedicationIntentStore {
             }
 
         guard !statuses.isEmpty else {
-            return medicationID == nil ? "No medications are scheduled for today." : "That medication is not scheduled for today."
+            return "No medications are scheduled for today."
         }
 
         return "Today's medication status: \(statuses.joined(separator: ", "))."

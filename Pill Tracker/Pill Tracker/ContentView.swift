@@ -1933,7 +1933,6 @@ struct ShortcutsView: View {
                     }
 
                     ShortcutInstructionCard(title: "How to Check Medication Status", icon: "list.bullet.clipboard") {
-                        ShortcutPhraseText("Did I take my pills in Pill Tracker?")
                         ShortcutPhraseText("Pill Tracker status report")
                         ShortcutPhraseText("Pill Tracker medication status")
                         ShortcutPhraseText("Pill Tracker pill status")
