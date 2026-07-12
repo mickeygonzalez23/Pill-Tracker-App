@@ -1922,9 +1922,10 @@ struct ShortcutsView: View {
                                     Text(medication.siriNickname)
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
-                                    ShortcutPhraseText("Mark \(medication.siriNickname) as taken in Pill Tracker")
-                                    ShortcutPhraseText("Mark \(medication.siriNickname) as not sure in Pill Tracker")
-                                    ShortcutPhraseText("Mark \(medication.siriNickname) as skipped in Pill Tracker")
+
+                                    ShortcutPhraseText("I took \(medication.siriNickname) in Pill Tracker")
+                                    ShortcutPhraseText("I'm not sure if I took \(medication.siriNickname) in Pill Tracker")
+                                    ShortcutPhraseText("Skip \(medication.siriNickname) in Pill Tracker")
                                 }
                                 .padding(.vertical, 2)
                             }

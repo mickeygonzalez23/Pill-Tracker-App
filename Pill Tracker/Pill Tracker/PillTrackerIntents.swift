@@ -243,29 +243,21 @@ struct MarkMedicationSkippedIntent: AppIntent {
                 among: selection.candidateDoseNumbers,
                 dialog: IntentDialog(stringLiteral: selection.choicePrompt ?? "Which dose?")
             )
-            try await requestConfirmation(
-                actionName: .continue,
-                dialog: "Confirm marking this dose as skipped."
-            )
             return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseNumberWithMessage(id: medication.id, doseNumber: selected, as: .skipped)))
         }
         guard let doseTime = selection.doseTime else {
             return .result(dialog: "I could not find a dose to log.")
         }
-        try await requestConfirmation(
-            actionName: .continue,
-            dialog: "Confirm marking \(medication.name) at \(doseTime) as skipped."
-        )
         return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseWithMessage(id: medication.id, doseTime: doseTime, as: .skipped)))
     }
 }
 struct CheckDueMedicationsIntent: AppIntent {
     static var title: LocalizedStringResource = "Pill Tracker Status"
-    static var description = IntentDescription("Gives today's status for each scheduled medication dose without changing it.")
+    static var description = IntentDescription("Gives a status report for medications still due today.")
     static var openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let message = MedicationIntentStore.medicationsStatusSummary()
+        let message = MedicationIntentStore.dueMedicationsSummary()
         return .result(dialog: IntentDialog(stringLiteral: message))
     }
 }
@@ -275,7 +267,8 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: MarkMedicationTakenIntent(),
             phrases: [
-                "Mark \(\.$medication) as taken in \(.applicationName)"
+                "Mark \(\.$medication) as taken in \(.applicationName)",
+                "I took \(\.$medication) in \(.applicationName)"
             ],
             shortTitle: "Mark Taken",
             systemImageName: "checkmark.circle"
@@ -284,7 +277,8 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: MarkMedicationUnsureIntent(),
             phrases: [
-                "Mark \(\.$medication) as not sure in \(.applicationName)"
+                "Mark \(\.$medication) as not sure in \(.applicationName)",
+                "I'm not sure if I took \(\.$medication) in \(.applicationName)"
             ],
             shortTitle: "Not Sure",
             systemImageName: "questionmark.circle"
@@ -293,7 +287,8 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: MarkMedicationSkippedIntent(),
             phrases: [
-                "Mark \(\.$medication) as skipped in \(.applicationName)"
+                "Mark \(\.$medication) as skipped in \(.applicationName)",
+                "Skip \(\.$medication) in \(.applicationName)"
             ],
             shortTitle: "Skipped",
             systemImageName: "forward.circle"
@@ -312,10 +307,9 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
                 "What meds are due in \(.applicationName)",
                 "List due meds in \(.applicationName)"
             ],
-            shortTitle: "Medication Status",
-            systemImageName: "list.bullet.clipboard"
+            shortTitle: "What's Due",
+            systemImageName: "clock"
         )
-
     }
 }
 
@@ -452,21 +446,24 @@ enum MedicationIntentStore {
         return "Marked \(medications[index].siriNickname) at \(doseTime) as \(spokenStatus(status))."
     }
 
-    nonisolated static func medicationsStatusSummary() -> String {
-        let statuses = loadMedications()
+    nonisolated static func dueMedicationsSummary() -> String {
+        let dueDoseNames = loadMedications()
             .filter { $0.isScheduled(on: Date()) }
             .flatMap { medication in
-                medication.doseTimes(on: Date()).map { doseTime in
-                    let status = medication.doseStatus(for: doseTime, on: Date())
-                    return "\(medication.siriNickname) at \(doseTime) is \(spokenStatus(status))"
+                medication.doseTimes(on: Date()).compactMap { doseTime -> String? in
+                    guard medication.doseStatus(for: doseTime, on: Date()) == .due else {
+                        return nil
+                    }
+
+                    return "\(medication.siriNickname) at \(doseTime)"
                 }
             }
 
-        guard !statuses.isEmpty else {
-            return "No medications are scheduled for today."
+        guard !dueDoseNames.isEmpty else {
+            return "No medications are still due today."
         }
 
-        return "Today's medication status: \(statuses.joined(separator: ", "))."
+        return "Still due today: \(dueDoseNames.joined(separator: ", "))."
     }
 
     nonisolated private static func doseTimeToLog(from doseTimes: [String], scheduledDoseTimes: [String]) -> DoseSelection {
