@@ -301,7 +301,7 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
                 "\(.applicationName) medication status",
                 "\(.applicationName) pill status",
                 "Run status report in \(.applicationName)",
-                "Did I take my pills in \(.applicationName)",
+                "Did I take my pills in \(.applicationName)?",
                 "Check my pills in \(.applicationName)",
                 "Check pill status in \(.applicationName)",
                 "What's due in \(.applicationName)",
