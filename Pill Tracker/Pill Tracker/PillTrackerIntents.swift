@@ -120,20 +120,18 @@ enum MedicationShortcutAction: String, AppEnum {
     case taken
     case unsure
     case skipped
-    case status
 
     static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Medication Action")
     static var caseDisplayRepresentations: [MedicationShortcutAction: DisplayRepresentation] = [
         .taken: "Taken",
         .unsure: "Not Sure",
-        .skipped: "Skipped",
-        .status: "Status Report"
+        .skipped: "Skipped"
     ]
 }
 
 struct MedicationShortcutIntent: AppIntent {
-    static var title: LocalizedStringResource = "Pill Tracker Medication Action"
-    static var description = IntentDescription("Logs an explicitly requested dose status or gives a read-only medication status report.")
+    static var title: LocalizedStringResource = "Log Medication Dose"
+    static var description = IntentDescription("Logs a medication dose using the status explicitly provided by the user.")
     static var openAppWhenRun = false
 
     @Parameter(title: "Action") var action: MedicationShortcutAction
@@ -141,22 +139,12 @@ struct MedicationShortcutIntent: AppIntent {
     @Parameter(title: "Dose") var doseNumber: DoseNumber?
 
     init() {
-        action = .status
-        medication = nil
-        doseNumber = nil
-    }
-
-    init(action: MedicationShortcutAction) {
-        self.action = action
+        action = .taken
         medication = nil
         doseNumber = nil
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        if action == .status {
-            return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.medicationsStatusSummary()))
-        }
-
         let selectedMedication: MedicationEntity
         if let medication {
             selectedMedication = medication
@@ -176,7 +164,6 @@ struct MedicationShortcutIntent: AppIntent {
         case .taken: .taken
         case .unsure: .unsure
         case .skipped: .skipped
-        case .status: .due
         }
 
         if selection.needsChoice {
@@ -355,7 +342,6 @@ struct MarkMedicationSkippedIntent: AppIntent {
     }
 }
 struct CheckDueMedicationsIntent: AppIntent {
-    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Pill Tracker Status"
     static var description = IntentDescription("Gives today's status for each scheduled medication dose without changing it.")
     static var openAppWhenRun = false
@@ -369,7 +355,7 @@ struct CheckDueMedicationsIntent: AppIntent {
 struct PillTrackerShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: MedicationShortcutIntent(action: .status),
+            intent: CheckDueMedicationsIntent(),
             phrases: [
                 "Check my medication status in \(.applicationName)",
                 "\(.applicationName) status report",
@@ -381,30 +367,12 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         )
 
         AppShortcut(
-            intent: MedicationShortcutIntent(action: .taken),
+            intent: MedicationShortcutIntent(),
             phrases: [
-                "Mark \(\.$medication) as taken in \(.applicationName)"
+                "Mark my medication as \(\.$action) in \(.applicationName)"
             ],
-            shortTitle: "Mark Taken",
-            systemImageName: "checkmark.circle"
-        )
-
-        AppShortcut(
-            intent: MedicationShortcutIntent(action: .unsure),
-            phrases: [
-                "Mark \(\.$medication) as not sure in \(.applicationName)"
-            ],
-            shortTitle: "Not Sure",
-            systemImageName: "questionmark.circle"
-        )
-
-        AppShortcut(
-            intent: MedicationShortcutIntent(action: .skipped),
-            phrases: [
-                "Mark \(\.$medication) as skipped in \(.applicationName)"
-            ],
-            shortTitle: "Skipped",
-            systemImageName: "forward.circle"
+            shortTitle: "Log Medication",
+            systemImageName: "pills.circle"
         )
 
     }

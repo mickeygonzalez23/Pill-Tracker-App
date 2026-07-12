@@ -1917,18 +1917,11 @@ struct ShortcutsView: View {
                             Text("Add a medication to make shortcut actions available.")
                                 .foregroundStyle(.secondary)
                         } else {
-                            ForEach(medications) { medication in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(medication.siriNickname)
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-
-                                    ShortcutPhraseText("Mark \(medication.siriNickname) as taken in Pill Tracker")
-                                    ShortcutPhraseText("Mark \(medication.siriNickname) as not sure in Pill Tracker")
-                                    ShortcutPhraseText("Mark \(medication.siriNickname) as skipped in Pill Tracker")
-                                }
-                                .padding(.vertical, 2)
-                            }
+                            ShortcutPhraseText("Mark my medication as taken in Pill Tracker")
+                            ShortcutPhraseText("Mark my medication as not sure in Pill Tracker")
+                            ShortcutPhraseText("Mark my medication as skipped in Pill Tracker")
+                            Text("Siri will ask which medication to log.")
+                                .foregroundStyle(.secondary)
                         }
                     }
 
@@ -1939,7 +1932,7 @@ struct ShortcutsView: View {
                     }
 
                     ShortcutInstructionCard(title: "Multiple Daily Doses", icon: "clock.badge.questionmark") {
-                        Text("When one dose clearly matches the current time, the shortcut logs that dose for the medication you name.")
+                        Text("After you choose a medication, the shortcut logs the dose that best matches the current time.")
                         Text("If multiple close doses are unlogged, the shortcut asks which dose and includes the scheduled times, such as first dose at 8:00 AM or second dose at 12:00 PM.")
                     }
 
