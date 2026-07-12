@@ -116,7 +116,100 @@ enum DoseNumber: String, AppEnum {
     }
 }
 
+enum MedicationShortcutAction: String, AppEnum {
+    case taken
+    case unsure
+    case skipped
+    case status
+
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Medication Action")
+    static var caseDisplayRepresentations: [MedicationShortcutAction: DisplayRepresentation] = [
+        .taken: "Taken",
+        .unsure: "Not Sure",
+        .skipped: "Skipped",
+        .status: "Status Report"
+    ]
+}
+
+struct MedicationShortcutIntent: AppIntent {
+    static var title: LocalizedStringResource = "Pill Tracker Medication Action"
+    static var description = IntentDescription("Logs an explicitly requested dose status or gives a read-only medication status report.")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "Action") var action: MedicationShortcutAction
+    @Parameter(title: "Medication") var medication: MedicationEntity?
+    @Parameter(title: "Dose") var doseNumber: DoseNumber?
+
+    init() {
+        action = .status
+        medication = nil
+        doseNumber = nil
+    }
+
+    init(action: MedicationShortcutAction) {
+        self.action = action
+        medication = nil
+        doseNumber = nil
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        if action == .status {
+            return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.medicationsStatusSummary()))
+        }
+
+        let selectedMedication: MedicationEntity
+        if let medication {
+            selectedMedication = medication
+        } else {
+            selectedMedication = try await $medication.requestDisambiguation(
+                among: MedicationIntentStore.medicationEntities(),
+                dialog: "Which medication?"
+            )
+        }
+
+        let selection = MedicationIntentStore.doseSelection(for: selectedMedication.id, selectedDoseNumber: doseNumber)
+        if let message = selection.message {
+            return .result(dialog: IntentDialog(stringLiteral: message))
+        }
+
+        let status: DoseStatus = switch action {
+        case .taken: .taken
+        case .unsure: .unsure
+        case .skipped: .skipped
+        case .status: .due
+        }
+
+        if selection.needsChoice {
+            let selectedDose = try await $doseNumber.requestDisambiguation(
+                among: selection.candidateDoseNumbers,
+                dialog: IntentDialog(stringLiteral: selection.choicePrompt ?? "Which dose?")
+            )
+            if status == .skipped {
+                try await requestConfirmation(actionName: .continue, dialog: "Confirm marking this dose as skipped.")
+            }
+            return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseNumberWithMessage(
+                id: selectedMedication.id,
+                doseNumber: selectedDose,
+                as: status
+            )))
+        }
+
+        guard let doseTime = selection.doseTime else {
+            return .result(dialog: "I could not find a dose to log.")
+        }
+        if status == .skipped {
+            try await requestConfirmation(actionName: .continue, dialog: "Confirm marking \(selectedMedication.name) at \(doseTime) as skipped.")
+        }
+        return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseWithMessage(
+            id: selectedMedication.id,
+            doseTime: doseTime,
+            as: status
+        )))
+    }
+}
+
 struct MarkMedicationTakenIntent: AppIntent {
+    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Mark Medication Taken"
     static var description = IntentDescription("Marks the next relevant dose for a medication as taken using its private medication nickname.")
     static var openAppWhenRun = false
@@ -170,6 +263,7 @@ struct MarkMedicationTakenIntent: AppIntent {
 }
 
 struct MarkMedicationUnsureIntent: AppIntent {
+    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Mark Medication Not Sure"
     static var description = IntentDescription("Marks the next relevant dose for a medication as not sure using its private medication nickname.")
     static var openAppWhenRun = false
@@ -223,6 +317,7 @@ struct MarkMedicationUnsureIntent: AppIntent {
 }
 
 struct MarkMedicationSkippedIntent: AppIntent {
+    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Mark Medication Skipped"
     static var description = IntentDescription("Marks the next relevant dose for a medication as skipped using its private medication nickname.")
     static var openAppWhenRun = false
@@ -260,6 +355,7 @@ struct MarkMedicationSkippedIntent: AppIntent {
     }
 }
 struct CheckDueMedicationsIntent: AppIntent {
+    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Pill Tracker Status"
     static var description = IntentDescription("Gives today's status for each scheduled medication dose without changing it.")
     static var openAppWhenRun = false
@@ -273,7 +369,7 @@ struct CheckDueMedicationsIntent: AppIntent {
 struct PillTrackerShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: CheckDueMedicationsIntent(),
+            intent: MedicationShortcutIntent(action: .status),
             phrases: [
                 "Check my medication status in \(.applicationName)",
                 "\(.applicationName) status report",
@@ -285,7 +381,7 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         )
 
         AppShortcut(
-            intent: MarkMedicationTakenIntent(),
+            intent: MedicationShortcutIntent(action: .taken),
             phrases: [
                 "Mark \(\.$medication) as taken in \(.applicationName)"
             ],
@@ -294,7 +390,7 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         )
 
         AppShortcut(
-            intent: MarkMedicationUnsureIntent(),
+            intent: MedicationShortcutIntent(action: .unsure),
             phrases: [
                 "Mark \(\.$medication) as not sure in \(.applicationName)"
             ],
@@ -303,7 +399,7 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
         )
 
         AppShortcut(
-            intent: MarkMedicationSkippedIntent(),
+            intent: MedicationShortcutIntent(action: .skipped),
             phrases: [
                 "Mark \(\.$medication) as skipped in \(.applicationName)"
             ],
