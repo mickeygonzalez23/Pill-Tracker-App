@@ -116,86 +116,6 @@ enum DoseNumber: String, AppEnum {
     }
 }
 
-enum MedicationShortcutAction: String, AppEnum {
-    case taken
-    case unsure
-    case skipped
-
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Medication Action")
-    static var caseDisplayRepresentations: [MedicationShortcutAction: DisplayRepresentation] = [
-        .taken: "Taken",
-        .unsure: "Not Sure",
-        .skipped: "Skipped"
-    ]
-}
-
-struct MedicationShortcutIntent: AppIntent {
-    static var isDiscoverable = false
-    static var title: LocalizedStringResource = "Log Medication Dose"
-    static var description = IntentDescription("Logs a medication dose using the status explicitly provided by the user.")
-    static var openAppWhenRun = false
-
-    @Parameter(title: "Action") var action: MedicationShortcutAction
-    @Parameter(title: "Medication") var medication: MedicationEntity?
-    @Parameter(title: "Dose") var doseNumber: DoseNumber?
-
-    init() {
-        action = .taken
-        medication = nil
-        doseNumber = nil
-    }
-
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let selectedMedication: MedicationEntity
-        if let medication {
-            selectedMedication = medication
-        } else {
-            selectedMedication = try await $medication.requestDisambiguation(
-                among: MedicationIntentStore.medicationEntities(),
-                dialog: "Which medication?"
-            )
-        }
-
-        let selection = MedicationIntentStore.doseSelection(for: selectedMedication.id, selectedDoseNumber: doseNumber)
-        if let message = selection.message {
-            return .result(dialog: IntentDialog(stringLiteral: message))
-        }
-
-        let status: DoseStatus = switch action {
-        case .taken: .taken
-        case .unsure: .unsure
-        case .skipped: .skipped
-        }
-
-        if selection.needsChoice {
-            let selectedDose = try await $doseNumber.requestDisambiguation(
-                among: selection.candidateDoseNumbers,
-                dialog: IntentDialog(stringLiteral: selection.choicePrompt ?? "Which dose?")
-            )
-            if status == .skipped {
-                try await requestConfirmation(actionName: .continue, dialog: "Confirm marking this dose as skipped.")
-            }
-            return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseNumberWithMessage(
-                id: selectedMedication.id,
-                doseNumber: selectedDose,
-                as: status
-            )))
-        }
-
-        guard let doseTime = selection.doseTime else {
-            return .result(dialog: "I could not find a dose to log.")
-        }
-        if status == .skipped {
-            try await requestConfirmation(actionName: .continue, dialog: "Confirm marking \(selectedMedication.name) at \(doseTime) as skipped.")
-        }
-        return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseWithMessage(
-            id: selectedMedication.id,
-            doseTime: doseTime,
-            as: status
-        )))
-    }
-}
-
 struct MarkMedicationTakenIntent: AppIntent {
     static var title: LocalizedStringResource = "Mark Medication Taken"
     static var description = IntentDescription("Marks the next relevant dose for a medication as taken using its private medication nickname.")
@@ -340,7 +260,6 @@ struct MarkMedicationSkippedIntent: AppIntent {
     }
 }
 struct CheckDueMedicationsIntent: AppIntent {
-    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Pill Tracker Status"
     static var description = IntentDescription("Gives today's status for each scheduled medication dose without changing it.")
     static var openAppWhenRun = false
@@ -378,6 +297,23 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Skipped",
             systemImageName: "forward.circle"
+        )
+
+        AppShortcut(
+            intent: CheckDueMedicationsIntent(),
+            phrases: [
+                "\(.applicationName) status report",
+                "\(.applicationName) medication status",
+                "\(.applicationName) pill status",
+                "Run status report in \(.applicationName)",
+                "Check my pills in \(.applicationName)",
+                "Check pill status in \(.applicationName)",
+                "What's due in \(.applicationName)",
+                "What meds are due in \(.applicationName)",
+                "List due meds in \(.applicationName)"
+            ],
+            shortTitle: "Medication Status",
+            systemImageName: "list.bullet.clipboard"
         )
 
     }

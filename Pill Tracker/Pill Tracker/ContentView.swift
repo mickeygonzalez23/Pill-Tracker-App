@@ -1931,6 +1931,12 @@ struct ShortcutsView: View {
                         }
                     }
 
+                    ShortcutInstructionCard(title: "How to Check Medication Status", icon: "list.bullet.clipboard") {
+                        ShortcutPhraseText("Pill Tracker status report")
+                        ShortcutPhraseText("Pill Tracker medication status")
+                        ShortcutPhraseText("Pill Tracker pill status")
+                    }
+
                     ShortcutInstructionCard(title: "Multiple Daily Doses", icon: "clock.badge.questionmark") {
                         Text("When one dose clearly matches the current time, the shortcut logs that dose for the medication you name.")
                         Text("If multiple close doses are unlogged, the shortcut asks which dose and includes the scheduled times, such as first dose at 8:00 AM or second dose at 12:00 PM.")
