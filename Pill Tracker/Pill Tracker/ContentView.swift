@@ -2009,6 +2009,7 @@ struct SettingsView: View {
             List {
                 Section("Notifications") {
                     Text("Allow notifications in iPhone Settings to receive reminders.")
+                    Text("When a reminder notification pops up, you may press and hold it to log your dose straight from the notification.")
                 }
 
                 Section("Shortcuts") {
