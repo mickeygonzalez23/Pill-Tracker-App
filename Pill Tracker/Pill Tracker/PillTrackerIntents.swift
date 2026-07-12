@@ -243,16 +243,24 @@ struct MarkMedicationSkippedIntent: AppIntent {
                 among: selection.candidateDoseNumbers,
                 dialog: IntentDialog(stringLiteral: selection.choicePrompt ?? "Which dose?")
             )
+            try await requestConfirmation(
+                actionName: .continue,
+                dialog: "Confirm marking this dose as skipped."
+            )
             return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseNumberWithMessage(id: medication.id, doseNumber: selected, as: .skipped)))
         }
         guard let doseTime = selection.doseTime else {
             return .result(dialog: "I could not find a dose to log.")
         }
+        try await requestConfirmation(
+            actionName: .continue,
+            dialog: "Confirm marking \(medication.name) at \(doseTime) as skipped."
+        )
         return .result(dialog: IntentDialog(stringLiteral: MedicationIntentStore.markMedicationDoseWithMessage(id: medication.id, doseTime: doseTime, as: .skipped)))
     }
 }
 struct CheckDueMedicationsIntent: AppIntent {
-    static var title: LocalizedStringResource = "Pill Tracker Status"
+    static var title: LocalizedStringResource = "Did I Take My Pills?"
     static var description = IntentDescription("Gives today's status for each scheduled medication dose without changing it.")
     static var openAppWhenRun = false
 
@@ -264,6 +272,17 @@ struct CheckDueMedicationsIntent: AppIntent {
 
 struct PillTrackerShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: CheckDueMedicationsIntent(),
+            phrases: [
+                "Did I take my pills in \(.applicationName)?",
+                "Check my medication status in \(.applicationName)",
+                "\(.applicationName) status report"
+            ],
+            shortTitle: "Did I Take My Pills?",
+            systemImageName: "list.bullet.clipboard"
+        )
+
         AppShortcut(
             intent: MarkMedicationTakenIntent(),
             phrases: [
@@ -291,23 +310,6 @@ struct PillTrackerShortcuts: AppShortcutsProvider {
             systemImageName: "forward.circle"
         )
 
-        AppShortcut(
-            intent: CheckDueMedicationsIntent(),
-            phrases: [
-                "\(.applicationName) status report",
-                "\(.applicationName) medication status",
-                "\(.applicationName) pill status",
-                "Run status report in \(.applicationName)",
-                "Did I take my pills in \(.applicationName)?",
-                "Check my pills in \(.applicationName)",
-                "Check pill status in \(.applicationName)",
-                "What's due in \(.applicationName)",
-                "What meds are due in \(.applicationName)",
-                "List due meds in \(.applicationName)"
-            ],
-            shortTitle: "What's Due",
-            systemImageName: "clock"
-        )
     }
 }
 
