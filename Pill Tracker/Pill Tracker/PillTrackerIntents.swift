@@ -130,6 +130,7 @@ enum MedicationShortcutAction: String, AppEnum {
 }
 
 struct MedicationShortcutIntent: AppIntent {
+    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Log Medication Dose"
     static var description = IntentDescription("Logs a medication dose using the status explicitly provided by the user.")
     static var openAppWhenRun = false
@@ -196,7 +197,6 @@ struct MedicationShortcutIntent: AppIntent {
 }
 
 struct MarkMedicationTakenIntent: AppIntent {
-    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Mark Medication Taken"
     static var description = IntentDescription("Marks the next relevant dose for a medication as taken using its private medication nickname.")
     static var openAppWhenRun = false
@@ -250,7 +250,6 @@ struct MarkMedicationTakenIntent: AppIntent {
 }
 
 struct MarkMedicationUnsureIntent: AppIntent {
-    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Mark Medication Not Sure"
     static var description = IntentDescription("Marks the next relevant dose for a medication as not sure using its private medication nickname.")
     static var openAppWhenRun = false
@@ -304,7 +303,6 @@ struct MarkMedicationUnsureIntent: AppIntent {
 }
 
 struct MarkMedicationSkippedIntent: AppIntent {
-    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Mark Medication Skipped"
     static var description = IntentDescription("Marks the next relevant dose for a medication as skipped using its private medication nickname.")
     static var openAppWhenRun = false
@@ -342,6 +340,7 @@ struct MarkMedicationSkippedIntent: AppIntent {
     }
 }
 struct CheckDueMedicationsIntent: AppIntent {
+    static var isDiscoverable = false
     static var title: LocalizedStringResource = "Pill Tracker Status"
     static var description = IntentDescription("Gives today's status for each scheduled medication dose without changing it.")
     static var openAppWhenRun = false
@@ -355,24 +354,30 @@ struct CheckDueMedicationsIntent: AppIntent {
 struct PillTrackerShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: CheckDueMedicationsIntent(),
+            intent: MarkMedicationTakenIntent(),
             phrases: [
-                "Check my medication status in \(.applicationName)",
-                "\(.applicationName) status report",
-                "\(.applicationName) medication status",
-                "\(.applicationName) pill status"
+                "Mark \(\.$medication) as taken in \(.applicationName)"
             ],
-            shortTitle: "Medication Status",
-            systemImageName: "list.bullet.clipboard"
+            shortTitle: "Mark Taken",
+            systemImageName: "checkmark.circle"
         )
 
         AppShortcut(
-            intent: MedicationShortcutIntent(),
+            intent: MarkMedicationUnsureIntent(),
             phrases: [
-                "Mark my medication as \(\.$action) in \(.applicationName)"
+                "Mark \(\.$medication) as not sure in \(.applicationName)"
             ],
-            shortTitle: "Log Medication",
-            systemImageName: "pills.circle"
+            shortTitle: "Not Sure",
+            systemImageName: "questionmark.circle"
+        )
+
+        AppShortcut(
+            intent: MarkMedicationSkippedIntent(),
+            phrases: [
+                "Mark \(\.$medication) as skipped in \(.applicationName)"
+            ],
+            shortTitle: "Skipped",
+            systemImageName: "forward.circle"
         )
 
     }
